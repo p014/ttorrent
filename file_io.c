@@ -20,10 +20,10 @@
  * @param target_digest is the expected checksum.
  * @return 0 if block matches checksum, -1 otherwise.
  */
-static int verify_block(const struct block_t *const block, const sha256_hash_t target_digest) {
+static int fio__verify_block(const struct fio_block_t *const block, const fio_sha256_hash_t target_digest) {
     assert(block != NULL);
     assert(block->size > 0);
-    assert(block->size <= MAX_BLOCK_SIZE);
+    assert(block->size <= FIO_MAX_BLOCK_SIZE);
 
     unsigned char real_digest[SHA256_DIGEST_LENGTH];
 
@@ -41,7 +41,7 @@ static int verify_block(const struct block_t *const block, const sha256_hash_t t
  * @param f is a FILE stream.
  * @return 0 on success, -1 otherwise.
  */
-static int skip_comment_lines(FILE *const f) {
+static int fio__skip_comment_lines(FILE *const f) {
 
     while (1) {
         int c = fgetc(f);
@@ -78,7 +78,7 @@ static int skip_comment_lines(FILE *const f) {
  * @param f is an input FILE stream.
  * @return 0 on success, -1 otherwise.
  */
-static int read_hash_from_file(sha256_hash_t hash, FILE *const f) {
+static int fio__read_hash_from_file(fio_sha256_hash_t hash, FILE *const f) {
 
     char buffer[SHA256_DIGEST_LENGTH * 2 + 1] = {0};
 
@@ -107,8 +107,8 @@ static int read_hash_from_file(sha256_hash_t hash, FILE *const f) {
     return 0;
 }
 
-int create_torrent_from_metainfo_file(const char *const metainfo_file_name, struct torrent_t *const torrent,
-                                      const char *const downloaded_file_name) {
+int fio_create_torrent_from_metainfo_file(const char *const metainfo_file_name, struct fio_torrent_t *const torrent,
+                                          const char *const downloaded_file_name) {
 
     assert(metainfo_file_name != NULL);
     assert(torrent != NULL);
@@ -127,15 +127,15 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
     torrent->metainfo_file_name = metainfo_file_name;
 
     // FILE HEADER
-    if (skip_comment_lines(f)) {
+    if (fio__skip_comment_lines(f)) {
         return -1;
     }
 
-    if (read_hash_from_file(torrent->downloaded_file_hash, f)) {
+    if (fio__read_hash_from_file(torrent->downloaded_file_hash, f)) {
         return -1;
     }
 
-    if (skip_comment_lines(f)) {
+    if (fio__skip_comment_lines(f)) {
         return -1;
     }
 
@@ -149,7 +149,7 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
 
     log_printf(LOG_DEBUG, "\tDownloaded file size is: %d", torrent->downloaded_file_size);
 
-    if (skip_comment_lines(f)) {
+    if (fio__skip_comment_lines(f)) {
         return -1;
     }
 
@@ -164,7 +164,7 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
     log_printf(LOG_DEBUG, "\tPeer count is: %d", torrent->peer_count);
 
     // This is the correct way to do ceil(torrent->downloaded_file_size / (double)MAX_BLOCK_SIZE)
-    torrent->block_count = (torrent->downloaded_file_size + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE;
+    torrent->block_count = (torrent->downloaded_file_size + FIO_MAX_BLOCK_SIZE - 1) / FIO_MAX_BLOCK_SIZE;
 
     // We technically allow for torrent->downloaded_file_size == 0 and torrent->block_count == 0.
     if (torrent->peer_count == 0 || torrent->peer_count > 0xFFFF) {
@@ -175,16 +175,16 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
     // MEMORY ALLOCATION
 
     // We assume that...
-    assert(sizeof(sha256_hash_t) < MAX_BLOCK_SIZE);
-    assert(sizeof(uint_fast8_t) < MAX_BLOCK_SIZE);
+    assert(sizeof(fio_sha256_hash_t) < FIO_MAX_BLOCK_SIZE);
+    assert(sizeof(uint_fast8_t) < FIO_MAX_BLOCK_SIZE);
 
     // Let us then check for possible overflows in the following mallocs.
-    if (torrent->block_count > UINT64_MAX / MAX_BLOCK_SIZE || torrent->peer_count > UINT64_MAX / sizeof(struct peer_information_t)) {
+    if (torrent->block_count > UINT64_MAX / FIO_MAX_BLOCK_SIZE || torrent->peer_count > UINT64_MAX / sizeof(struct fio_peer_information_t)) {
         errno = ENOMEM;
         return -1;
     }
 
-    torrent->block_hashes = malloc(sizeof(sha256_hash_t) * torrent->block_count);
+    torrent->block_hashes = malloc(sizeof(fio_sha256_hash_t) * torrent->block_count);
 
     if (torrent->block_hashes == NULL) {
         return -1;
@@ -197,7 +197,7 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
         return -1;
     }
 
-    torrent->peers = malloc(sizeof(struct peer_information_t) * torrent->peer_count);
+    torrent->peers = malloc(sizeof(struct fio_peer_information_t) * torrent->peer_count);
 
     if (torrent->peers == NULL) {
         free(torrent->block_hashes);
@@ -208,11 +208,11 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
     // READ BLOCK HASHES
 
     for (uint64_t i = 0; i < torrent->block_count; i++) {
-        if (skip_comment_lines(f)) {
+        if (fio__skip_comment_lines(f)) {
             return -1;
         }
 
-        if (read_hash_from_file(torrent->block_hashes[i], f)) {
+        if (fio__read_hash_from_file(torrent->block_hashes[i], f)) {
             return -1;
         }
     }
@@ -220,7 +220,7 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
     // READ PEERS
 
     for (uint64_t i = 0; i < torrent->peer_count; i++) {
-        if (skip_comment_lines(f)) {
+        if (fio__skip_comment_lines(f)) {
             return -1;
         }
 
@@ -351,13 +351,13 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
 
     for (uint64_t block_number = 0; block_number < torrent->block_count; block_number++) {
 
-        struct block_t block;
+        struct fio_block_t block;
 
-        if (load_block(torrent, block_number, &block)) {
+        if (fio_load_block(torrent, block_number, &block)) {
             return -1;
         }
 
-        torrent->block_map[block_number] = verify_block(&block, torrent->block_hashes[block_number]) == 0;
+        torrent->block_map[block_number] = fio__verify_block(&block, torrent->block_hashes[block_number]) == 0;
 
         log_printf(LOG_DEBUG, "\tBlock %d is %s", block_number,
                    torrent->block_map[block_number] ? "correct" : "missing");
@@ -366,25 +366,25 @@ int create_torrent_from_metainfo_file(const char *const metainfo_file_name, stru
     return 0;
 }
 
-uint64_t get_block_size(const struct torrent_t *const torrent, const uint64_t block_number) {
+uint64_t fio_get_block_size(const struct fio_torrent_t *const torrent, const uint64_t block_number) {
     assert(torrent != NULL);
     assert(block_number < torrent->block_count);
 
     // While a zero-length file may be valid, it does not have any block for which to ask its size.
     assert(torrent->downloaded_file_size > 0);
 
-    const uint64_t last_block_size = torrent->downloaded_file_size % MAX_BLOCK_SIZE;
+    const uint64_t last_block_size = torrent->downloaded_file_size % FIO_MAX_BLOCK_SIZE;
 
-    return block_number + 1 == torrent->block_count ? last_block_size : MAX_BLOCK_SIZE;
+    return block_number + 1 == torrent->block_count ? last_block_size : FIO_MAX_BLOCK_SIZE;
 }
 
-int load_block(const struct torrent_t *const torrent, const uint64_t block_number, struct block_t *const block) {
+int fio_load_block(const struct fio_torrent_t *const torrent, const uint64_t block_number, struct fio_block_t *const block) {
     assert(torrent != NULL);
     assert(block_number < torrent->block_count);
     assert(block != NULL);
     assert(torrent->downloaded_file_stream != NULL);
 
-    const uint64_t offset64 = block_number * MAX_BLOCK_SIZE;
+    const uint64_t offset64 = block_number * FIO_MAX_BLOCK_SIZE;
 
     const off_t offset = (off_t)offset64;
 
@@ -399,7 +399,7 @@ int load_block(const struct torrent_t *const torrent, const uint64_t block_numbe
         return r1;
     }
 
-    block->size = get_block_size(torrent, block_number);
+    block->size = fio_get_block_size(torrent, block_number);
 
     const size_t r2 = fread(block->data, 1, block->size, torrent->downloaded_file_stream);
 
@@ -416,7 +416,7 @@ int load_block(const struct torrent_t *const torrent, const uint64_t block_numbe
     return 0;
 }
 
-int store_block(struct torrent_t *const torrent, const uint64_t block_number, const struct block_t *const block) {
+int fio_store_block(struct fio_torrent_t *const torrent, const uint64_t block_number, const struct fio_block_t *const block) {
 
     assert(torrent != NULL);
     assert(torrent->downloaded_file_stream != NULL);
@@ -426,14 +426,14 @@ int store_block(struct torrent_t *const torrent, const uint64_t block_number, co
     assert(block != NULL);
     assert(block->size > 0);
 
-    const int r1 = verify_block(block, torrent->block_hashes[block_number]);
+    const int r1 = fio__verify_block(block, torrent->block_hashes[block_number]);
 
     if (r1) {
         errno = EINVAL;
         return r1;
     }
 
-    const uint64_t offset64 = block_number * MAX_BLOCK_SIZE;
+    const uint64_t offset64 = block_number * FIO_MAX_BLOCK_SIZE;
 
     const off_t offset = (off_t)offset64;
 
@@ -459,7 +459,7 @@ int store_block(struct torrent_t *const torrent, const uint64_t block_number, co
     return 0;
 }
 
-int destroy_torrent(struct torrent_t *const torrent) {
+int fio_destroy_torrent(struct fio_torrent_t *const torrent) {
 
     assert(torrent != NULL);
     assert(torrent->block_hashes != NULL);
@@ -472,4 +472,89 @@ int destroy_torrent(struct torrent_t *const torrent) {
     free(torrent->peers);
 
     return fclose(torrent->downloaded_file_stream);
+}
+
+int fio__sha256_string(char *input, size_t len, char outputBuffer[65]) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    if (!SHA256_Init(&sha256))
+        return -1;
+    if (!SHA256_Update(&sha256, input, len))
+        return -1;
+    if (!SHA256_Final(hash, &sha256))
+        return -1;
+    for (uint64_t i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+    }
+    outputBuffer[64] = 0;
+    return 0;
+}
+
+int fio_create_metainfo(char *file_name) {
+    /*
+    A metainfo file contains, among others:
+    - The downloaded file length.
+    - The SHA256 hash of each block [https://en.wikipedia.org/wiki/SHA-2].
+    - A list of address of multiple server peers from which this file can be downloaded
+    */
+    assert(file_name != NULL);
+    log_printf(LOG_DEBUG, "Creating metainfo for %s", file_name);
+
+    // open file
+    FILE *const f = fopen(file_name, "rb");
+    if (f < 0) {
+        log_printf(LOG_INFO, "Failed to open file %s: %s", file_name, strerror(errno));
+        return -1;
+    }
+
+    struct fio__metainfo_t info = {0};
+
+    // obtain file size
+    fseek(f, 0L, SEEK_END);
+    info.size = ftell(f);
+    rewind(f);
+
+    log_printf(LOG_DEBUG, "Size is %li bytes", info.size);
+
+    // Calculate number of blocks
+    info.block_count = (info.size + FIO_MAX_BLOCK_SIZE - 1) / FIO_MAX_BLOCK_SIZE;
+    log_printf(LOG_DEBUG, "Block count is %li", info.block_count);
+
+    // Calculate SHA-256
+    info.block_sha256 = malloc(sizeof(fio__SHA256_STR_t) * info.block_count);
+    if (info.block_sha256 == NULL) return -1;
+
+    for (size_t i = 0; i < info.block_count; i++) {
+        uint8_t buffer[FIO_MAX_BLOCK_SIZE] = {0};
+        int64_t size = fread(buffer, 1, FIO_MAX_BLOCK_SIZE, f);
+        log_printf(LOG_DEBUG, "Calculating hash for block number %li (%i bytes)", i, size);
+        if (fio__sha256_string(buffer, size, info.block_sha256[i].hash) < 0) {
+            log_printf(LOG_INFO, "Error while generating hash for block %li (%i bytes)", i, size);
+            free(info.block_sha256);
+            return -1;
+        };
+        log_printf(LOG_DEBUG, "Hash for block %li is: %s", i, info.block_sha256[i].hash);
+    }
+    fclose(f);
+
+    // Create metainfo file
+    FILE *const out = fopen(strcat(file_name, ".ttorrent"), "w");
+    if (out < 0) {
+        log_printf(LOG_INFO, "Failed to create %s file: %s", strcat(file_name, ".ttorrent"), strerror(errno));
+        return -1;
+    }
+
+    fprintf(out, "#Size\n%li\n\n", info.size);
+
+    fprintf(out, "#SHA-256, number of blocks is %li\n", info.block_count);
+
+    for (size_t i = 0; i < info.block_count; i++) {
+        fprintf(out, "%s\n", info.block_sha256[i].hash);
+    }
+    fprintf(out, "\n");
+    // default peer
+    fprintf(out, "#Peers\nlocalhost:8080\n127.0.0.1:8080");
+    fclose(out);
+    free(info.block_sha256);
+    return 0;
 }
