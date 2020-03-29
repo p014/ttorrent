@@ -1,0 +1,18 @@
+{
+  "C_Cpp.intelliSenseEngineFallback": "Enabled",
+  "files.associations": {
+    "ostream": "cpp",
+    "list": "cpp",
+    "*.rmd": "markdown",
+    "main,py": "python",
+    "*.sh": "shellscript",
+    "unistd.h": "c",
+    "string.h": "c",
+    "stdlib.h": "c",
+    "netdb.h": "c",
+    "limits.h": "c",
+    "socket.h": "c",
+    "types.h": "c",
+    "file_io.h": "c"
+  }
+}
