@@ -518,6 +518,14 @@ int fio__sha256_string(char *input, size_t len, char outputBuffer[65]) {
 }
 
 int fio__writemetainfo(char *file_name, struct fio__metainfo_t *info) {
+    /* file format
+    #SHA-256 of the file
+    #Size
+    #Peer count
+    #SHA-256 of the blocks
+    #Peers
+    */
+
     FILE *const out = fopen(strcat(file_name, ".ttorrent"), "w");
     if (!out) {
         log_printf(LOG_INFO, "Failed to create %s file: %s", strcat(file_name, ".ttorrent"), strerror(errno));
@@ -589,7 +597,7 @@ int fio_create_metainfo(char *file_name) {
     log_printf(LOG_DEBUG, "Block count is %li", info.block_count);
 
     // Calculate SHA-256 for each block
-    info.block_sha256 = malloc(sizeof(fio__SHA256_STR_t) * info.block_count);
+    info.block_sha256 = (fio__SHA256_STR_t *)malloc(sizeof(fio__SHA256_STR_t) * info.block_count);
     if (info.block_sha256 == NULL) return -1;
 
     for (size_t i = 0; i < info.block_count; i++) {
