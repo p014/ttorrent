@@ -20,15 +20,14 @@ int main(int argc, char **argv) {
     set_log_level(LOG_DEBUG);
 
     log_printf(LOG_INFO, "Trivial Torrent (build %s %s)\n", __DATE__, __TIME__);
-    log_printf(LOG_DEBUG, "Commandline arguments");
-    for (size_t i = 1; i < argc; i++) {
+    log_printf(LOG_DEBUG, "Commandline arguments (%i arguments)", argc);
+    for (int i = 0; i < argc; i++) {
         log_printf(LOG_DEBUG, "%i %s", i, argv[i]);
     }
     log_printf(LOG_DEBUG, "\n");
 
     if (argc == 1) { // no params
-        char help_message[] =
-            "\
+        char help_message[] = "\
             Usage:\n\
             Download a file: ttorrent file.metainfo\n\
             Upload a file: ttorrent -l 8080 file.metainfo\n\
@@ -38,11 +37,26 @@ int main(int argc, char **argv) {
         exit(EXIT_SUCCESS);
     }
 
-    if (argc == 3) {
-        if (strcmp(argv[1], "-c") == 0) { // create metainfo file
-            fio_create_metainfo(argv[2]);
+    if (argc == 3 && strcmp(argv[1], "-c") == 0) { // create metainfo file
+        if (fio_create_metainfo(argv[2]) != 0) {
+            log_printf(LOG_INFO, "Failed to create metainfo file for %s", argv[2]);
+            exit(EXIT_FAILURE);
         }
+        exit(EXIT_SUCCESS);
     }
 
-    return 0;
+    if (argc == 2 && strstr(argv[1], ".metainfo") != NULL) { // client
+    client_init(argv[1]);
+    }
+
+    if (argc == 4 && strcmp(argv[1], "-l") == 0) { // server
+        server_init(atoi(argv[2]), argv[3]);
+    }
+	(void) MAGIC_NUMBER;
+	(void) MSG_REQUEST;
+	(void) MSG_RESPONSE_NA;
+	(void) MSG_RESPONSE_OK;
+
+    
+    exit(EXIT_SUCCESS);
 }

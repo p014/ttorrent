@@ -144,22 +144,21 @@ int fio_store_block(struct fio_torrent_t *const torrent, const uint64_t block_nu
  */
 int fio_destroy_torrent(struct fio_torrent_t *const torrent);
 
-/**
- * Create a metainfo from a file 
- */
-int fio__writemetainfo(char *, struct fio__metainfo_t *);
-int fio_create_metainfo(char *);
-
 typedef struct fio__SHA256_STR {
-    uint8_t hash[SHA256_STRING_LEN];
+    char hash[SHA256_STRING_LEN];
 } fio__SHA256_STR_t;
 
 struct fio__metainfo_t {
-    int64_t size;
+    uint64_t size;
     uint64_t block_count;
-    uint8_t file_hash[SHA256_STRING_LEN];
+    char file_hash[SHA256_STRING_LEN];
     fio__SHA256_STR_t *block_sha256;
 };
+/**
+ * Create a metainfo from a file 
+ */
+int fio_create_metainfo(char *);
+int fio__writemetainfo(char *, struct fio__metainfo_t *);
 
 /**
 * Create a SHA-256 hash from the input data
@@ -167,6 +166,6 @@ struct fio__metainfo_t {
 * modified by Pablo
 */
 int fio__sha256_string(char *, size_t, char outputBuffer[65]);
-int fio__sha256_file(int, char outputBuffer[65]);
+int fio__sha256_file(FILE *const, char outputBuffer[65]);
 
 #endif // FILE_IO_H_
