@@ -48,6 +48,7 @@
 #include <openssl/sha.h>
 #include <stdint.h>
 #include <stdio.h>
+#define SHA256_STRING_LEN 65
 
 /**
  * The maximum size of each block. All blocks, except possibly for the last one, shall have this size.
@@ -146,27 +147,26 @@ int fio_destroy_torrent(struct fio_torrent_t *const torrent);
 /**
  * Create a metainfo from a file 
  */
-#define SHA256_STRING_LEN 65
+int fio__writemetainfo(char *, struct fio__metainfo_t *);
+int fio_create_metainfo(char *);
 
 typedef struct fio__SHA256_STR {
     uint8_t hash[SHA256_STRING_LEN];
 } fio__SHA256_STR_t;
 
-
 struct fio__metainfo_t {
     int64_t size;
     uint64_t block_count;
+    uint8_t file_hash[SHA256_STRING_LEN];
     fio__SHA256_STR_t *block_sha256;
 };
-int fio_create_metainfo(char *);
 
 /**
 * Create a SHA-256 hash from the input data
-* @param input pointer to the buffer
-* @param size size of the buffer
-* @param outputBuffer string of the input
 * https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
+* modified by Pablo
 */
 int fio__sha256_string(char *, size_t, char outputBuffer[65]);
+int fio__sha256_file(int, char outputBuffer[65]);
 
 #endif // FILE_IO_H_

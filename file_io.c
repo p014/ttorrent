@@ -473,6 +473,26 @@ int fio_destroy_torrent(struct fio_torrent_t *const torrent) {
 
     return fclose(torrent->downloaded_file_stream);
 }
+int fio__sha256_file(int f, char outputBuffer[65]) {
+
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256_CTX sha256;
+    if (!SHA256_Init(&sha256))
+        return -1;
+    int64_t i;
+    uint8_t buf[FIO_MAX_BLOCK_SIZE] = {0};
+    while ((i = fread(buf, 1, FIO_MAX_BLOCK_SIZE, f)) > 0) {
+        if (!SHA256_Update(&sha256, buf, i)) return -1;
+    }
+    if (!SHA256_Final(hash, &sha256)) return -1;
+
+    for (uint64_t i = 0; i < SHA256_DIGEST_LENGTH; i++)
+        sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
+
+    outputBuffer[64] = 0;
+    rewind(f);
+    return 0;
+}
 
 int fio__sha256_string(char *input, size_t len, char outputBuffer[65]) {
     unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -483,11 +503,28 @@ int fio__sha256_string(char *input, size_t len, char outputBuffer[65]) {
         return -1;
     if (!SHA256_Final(hash, &sha256))
         return -1;
-    for (uint64_t i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+    for (uint64_t i = 0; i < SHA256_DIGEST_LENGTH; i++)
         sprintf(outputBuffer + (i * 2), "%02x", hash[i]);
-    }
+
     outputBuffer[64] = 0;
     return 0;
+}
+
+int fio__writemetainfo(char *file_name, struct fio__metainfo_t *info) {
+    FILE *const out = fopen(strcat(file_name, ".ttorrent"), "w");
+    if (out < 0) {
+        log_printf(LOG_INFO, "Failed to create %s file: %s", strcat(file_name, ".ttorrent"), strerror(errno));
+        return -1;
+    }
+    fprintf(out, "#SHA-256 of the file is\n%s\n", info->file_hash);
+    fprintf(out, "#Size\n%li\n", info->size);
+    fprintf(out, "#SHA-256, number of blocks is %li\n", info->block_count);
+    for (size_t i = 0; i < info->block_count; i++) {
+        fprintf(out, "%s\n", info->block_sha256[i].hash);
+    }
+    // default peer
+    fprintf(out, "#Peers\nlocalhost:8080\n127.0.0.1:8081\nlocalhost:8082");
+    fclose(out);
 }
 
 int fio_create_metainfo(char *file_name) {
@@ -499,6 +536,8 @@ int fio_create_metainfo(char *file_name) {
     */
     assert(file_name != NULL);
     log_printf(LOG_DEBUG, "Creating metainfo for %s", file_name);
+    // struct to save metainfo data
+    struct fio__metainfo_t info = {0};
 
     // open file
     FILE *const f = fopen(file_name, "rb");
@@ -507,7 +546,12 @@ int fio_create_metainfo(char *file_name) {
         return -1;
     }
 
-    struct fio__metainfo_t info = {0};
+    //file hash
+    if (fio__sha256_file(f, info.file_hash)) {
+        log_printf(LOG_INFO, "Failed to generate hash for the file");
+        return -1;
+    }
+    log_printf(LOG_DEBUG, "File hash: %s", info.file_hash);
 
     // obtain file size
     fseek(f, 0L, SEEK_END);
@@ -520,7 +564,7 @@ int fio_create_metainfo(char *file_name) {
     info.block_count = (info.size + FIO_MAX_BLOCK_SIZE - 1) / FIO_MAX_BLOCK_SIZE;
     log_printf(LOG_DEBUG, "Block count is %li", info.block_count);
 
-    // Calculate SHA-256
+    // Calculate SHA-256 for each block
     info.block_sha256 = malloc(sizeof(fio__SHA256_STR_t) * info.block_count);
     if (info.block_sha256 == NULL) return -1;
 
@@ -529,7 +573,7 @@ int fio_create_metainfo(char *file_name) {
         int64_t size = fread(buffer, 1, FIO_MAX_BLOCK_SIZE, f);
         log_printf(LOG_DEBUG, "Calculating hash for block number %li (%i bytes)", i, size);
         if (fio__sha256_string(buffer, size, info.block_sha256[i].hash) < 0) {
-            log_printf(LOG_INFO, "Error while generating hash for block %li (%i bytes)", i, size);
+            log_printf(LOG_DEBUG, "Error while generating hash for block %li (%i bytes)", i, size);
             free(info.block_sha256);
             return -1;
         };
@@ -538,23 +582,12 @@ int fio_create_metainfo(char *file_name) {
     fclose(f);
 
     // Create metainfo file
-    FILE *const out = fopen(strcat(file_name, ".ttorrent"), "w");
-    if (out < 0) {
-        log_printf(LOG_INFO, "Failed to create %s file: %s", strcat(file_name, ".ttorrent"), strerror(errno));
+    if (fio__writemetainfo(file_name, &info) < 0) {
+        log_printf(LOG_DEBUG, "Failed to write metainfo file: %s", strerror(errno));
+        free(info.block_sha256);
         return -1;
     }
 
-    fprintf(out, "#Size\n%li\n\n", info.size);
-
-    fprintf(out, "#SHA-256, number of blocks is %li\n", info.block_count);
-
-    for (size_t i = 0; i < info.block_count; i++) {
-        fprintf(out, "%s\n", info.block_sha256[i].hash);
-    }
-    fprintf(out, "\n");
-    // default peer
-    fprintf(out, "#Peers\nlocalhost:8080\n127.0.0.1:8080");
-    fclose(out);
     free(info.block_sha256);
     return 0;
 }
