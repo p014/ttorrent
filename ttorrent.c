@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     }
 
     if (argc == 4 && strcmp(argv[1], "-l") == 0) { // server
-        server_init(atoi(argv[2]), argv[3]);
+        server_init(argv[2], argv[3]);
     }
     (void)MAGIC_NUMBER;
     (void)MSG_REQUEST;
