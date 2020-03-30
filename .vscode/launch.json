@@ -11,8 +11,11 @@
       "request": "launch",
       "program": "${workspaceFolder}/bin/ttorrent",
       "args": [
-        "-c", // create metainfo
-        "testfile.txt"
+        // "-c", // create metainfo
+        // "testfile.txt"
+        "-l",//server
+        "8080",
+        "testfile.txt.ttorrent"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/bin/",

@@ -6,6 +6,7 @@
     "main,py": "python",
     "*.sh": "shellscript",
     "cstdlib": "c",
-    "logger.h": "c"
+    "logger.h": "c",
+    "file_io.h": "c"
   }
 }

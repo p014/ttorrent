@@ -46,17 +46,16 @@ int main(int argc, char **argv) {
     }
 
     if (argc == 2 && strstr(argv[1], ".metainfo") != NULL) { // client
-    client_init(argv[1]);
+        client_init(argv[1]);
     }
 
     if (argc == 4 && strcmp(argv[1], "-l") == 0) { // server
         server_init(atoi(argv[2]), argv[3]);
     }
-	(void) MAGIC_NUMBER;
-	(void) MSG_REQUEST;
-	(void) MSG_RESPONSE_NA;
-	(void) MSG_RESPONSE_OK;
+    (void)MAGIC_NUMBER;
+    (void)MSG_REQUEST;
+    (void)MSG_RESPONSE_NA;
+    (void)MSG_RESPONSE_OK;
 
-    
     exit(EXIT_SUCCESS);
 }
