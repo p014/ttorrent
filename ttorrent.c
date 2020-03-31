@@ -9,13 +9,7 @@
 #include <string.h>
 
 // https://en.wikipedia.org/wiki/Magic_number_(programming)#In_protocols
-static const uint32_t MAGIC_NUMBER = 0xde1c3230;
 
-static const uint8_t MSG_REQUEST = 0;
-static const uint8_t MSG_RESPONSE_OK = 1;
-static const uint8_t MSG_RESPONSE_NA = 2;
-
-enum { RAW_MESSAGE_SIZE = 13 };
 int main(int argc, char **argv) {
     set_log_level(LOG_DEBUG);
 
@@ -50,12 +44,14 @@ int main(int argc, char **argv) {
     }
 
     if (argc == 4 && strcmp(argv[1], "-l") == 0) { // server
-        server_init(argv[2], argv[3]);
+        log_message(LOG_INFO, "Starting server...");
+        int32_t port = atoi(argv[2]);
+        if (port > UINT16_MAX || port <= 0) {
+            log_printf(LOG_INFO, "Port must be a number between %i and %i", UINT16_MAX, 0);
+            exit(EXIT_FAILURE);
+        }
+        server_init((uint16_t)port, argv[3]);
     }
-    (void)MAGIC_NUMBER;
-    (void)MSG_REQUEST;
-    (void)MSG_RESPONSE_NA;
-    (void)MSG_RESPONSE_OK;
 
     exit(EXIT_SUCCESS);
 }

@@ -1,4 +1,5 @@
 #include "server.h"
+#include "enum.h"
 #include "file_io.h"
 #include "logger.h"
 #include <errno.h>
@@ -6,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/fcntl.h>
+#include <sys/unistd.h>
 
 /*
 1. Load a metainfo file (functionality is already available in the file_io API).
@@ -17,55 +20,75 @@
   followed by the raw block data.
   c. Otherwise, respond with a message signaling the unavailability of the block.
 */
-char *server__original_file_name(char *ttorrent) {
-    char *const end = strstr(ttorrent, ".ttorrent");
+
+char *server__original_file_name(const char *const ttorrent) {
+    const char *const end = strstr(ttorrent, ".ttorrent");
     if (end == NULL) {
         log_message(LOG_DEBUG, "Invalid file extension");
         return NULL;
     }
-    *end = '\0';
 
-    char *const buffer = (char *)malloc(sizeof(char) * strlen(ttorrent));
+    uint32_t size = (uint32_t)(labs(ttorrent - end));
+    char *const buffer = (char *)malloc(sizeof(char) * (size));
     if (buffer == NULL) {
-        log_printf(LOG_DEBUG, "failed to allocate buffer");
+        log_printf(LOG_DEBUG, "Failed to allocate buffer");
         return NULL;
     }
 
-    strcpy(buffer, ttorrent);
-    *end = '.';
+    strncpy(buffer, ttorrent, size);
 
     return buffer;
 }
 
-int server__init_socket(char *port) {
+int server__non_blocking(const int sockd) {
+    (void)sockd;
+    return 0;
+}
 
-    struct addrinfo hint, *res;
-    memset(&hint, 0, sizeof(struct sockaddr_in));
-    hint.ai_family = AF_INET;
-    hint.ai_socktype = SOCK_STREAM;
-    hint.ai_flags = AI_PASSIVE;
-
-    int c;
-    if ((c = getaddrinfo(NULL, port, &hint, &res)) != 0) {
-        log_printf(LOG_DEBUG, "Error while getting information about the host: %s", gai_strerror(c));
+int server__blocking(const int sockd) {
+    struct sockaddr_storage their_addr;
+    unsigned int size = sizeof(their_addr);
+    int rcv = accept(sockd, (struct sockaddr *)&their_addr, &size);
+    if (rcv < 0) {
+        log_printf(LOG_DEBUG, "Error while accepting the connection: %s", strerror(errno));
         return -1;
     }
+    log_message(LOG_DEBUG, "Recieved connection");
+    return 0;
+}
 
-    int s = socket(res->ai_family, res->ai_family, res->ai_protocol);
-    if (s == -1) {
+int server__init_socket(const uint16_t port, const int blocking) {
+
+    struct sockaddr_in hint;
+    memset(&hint, 0, sizeof(struct sockaddr_in));
+    hint.sin_family = AF_INET;
+    hint.sin_addr.s_addr = INADDR_ANY;
+    hint.sin_port = htons(port);
+
+    int s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) {
         log_printf(LOG_DEBUG, "Error while creating socket: %s", strerror(errno));
         return -1;
     }
+    if (blocking == SERVER__NON_BLOCK)
+        log_message(LOG_DEBUG, "Using non-blocking socket.");
+    else if (blocking == SERVER__BLOCK)
+        log_message(LOG_DEBUG, "Using blocking socket.");
 
-    if (!bind(s, res->ai_addr, res->ai_addrlen)) {
-        log_message(LOG_DEBUG, "Error while binding");
+    if (blocking == SERVER__NON_BLOCK && fcntl(s, O_NONBLOCK)) {
+        log_printf(LOG_DEBUG, "Error while setting the socket to nonblocking: %s", strerror(errno));
+        return -1;
+    }
+
+    if (bind(s, (struct sockaddr *)&hint, sizeof(hint))) {
+        log_printf(LOG_DEBUG, "Error while binding: %s", strerror(errno));
         return -1;
     }
     return s;
 }
 
 #define SERVER__BACKLOG 10
-int server_init(char *port, char *metainfo) {
+int server_init(uint16_t const port, const char *const metainfo) {
     struct fio_torrent_t torrent;
     // get original filename
     char *filename = server__original_file_name(metainfo);
@@ -80,22 +103,21 @@ int server_init(char *port, char *metainfo) {
         log_printf(LOG_INFO, "Failed to load metainfo: %s", strerror(errno));
         return -1;
     }
-    int s;
-    if ((s = server__init_socket(port)) == -1) {
-        log_printf(LOG_DEBUG, "Failed to init socket with port %i: ", port, strerror(errno));
+    int s = server__init_socket(port, SERVER__BLOCK);
+    if (s < 0) {
+        log_printf(LOG_DEBUG, "Failed to init socket with port %s", port);
         return -1;
     }
 
-    log_printf(LOG_DEBUG, "Listening on port %s", port);
-    if (listen(s, SERVER__BACKLOG) == -1) {
+    log_printf(LOG_DEBUG, "Listening on port %s\n", port);
+    if (listen(s, SERVER__BACKLOG)) {
         log_printf(LOG_DEBUG, "Failed to listen: %s", strerror(errno));
         return -1;
     }
 
-    log_message(LOG_DEBUG, "Recieved a new connection");
-    struct sockaddr_storage their_addr;
-    unsigned int size = sizeof(their_addr);
-    int rcv = accept(s, (struct sockaddr *)&their_addr, &size);
-    (void)rcv;
+    if (fio_destroy_torrent(&torrent)) {
+        log_printf(LOG_DEBUG, "Error while destroying the torrent struct: ", strerror(errno));
+        return -1;
+    }
     return 0;
 }
