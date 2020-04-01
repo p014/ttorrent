@@ -7,6 +7,11 @@
     "*.sh": "shellscript",
     "cstdlib": "c",
     "logger.h": "c",
-    "file_io.h": "c"
+    "file_io.h": "c",
+    "server.h": "c",
+    "limits": "c",
+    "*.tcc": "c",
+    "netdb.h": "c",
+    "enum.h": "c"
   }
 }

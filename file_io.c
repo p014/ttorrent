@@ -597,7 +597,7 @@ int fio_create_metainfo(char *file_name) {
     log_printf(LOG_DEBUG, "Block count is %li", info.block_count);
 
     // Calculate SHA-256 for each block
-    info.block_sha256 = (fio__SHA256_STR_t *)malloc(sizeof(fio__SHA256_STR_t) * info.block_count);
+    info.block_sha256 = (fio___SHA256_STR_t *)malloc(sizeof(fio___SHA256_STR_t) * info.block_count);
     if (info.block_sha256 == NULL) return -1;
 
     for (size_t i = 0; i < info.block_count; i++) {

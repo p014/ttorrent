@@ -146,14 +146,15 @@ int fio_destroy_torrent(struct fio_torrent_t *const torrent);
 
 typedef struct fio__SHA256_STR {
     char hash[SHA256_STRING_LEN];
-} fio__SHA256_STR_t;
+} fio___SHA256_STR_t;
 
 struct fio__metainfo_t {
     uint64_t size;
     uint64_t block_count;
     char file_hash[SHA256_STRING_LEN];
-    fio__SHA256_STR_t *block_sha256;
+    fio___SHA256_STR_t *block_sha256;
 };
+
 /**
  * Create a metainfo from a file 
  */
