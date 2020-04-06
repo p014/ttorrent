@@ -167,6 +167,7 @@ int fio__writemetainfo(char *, struct fio__metainfo_t *);
 * modified by Pablo
 */
 int fio__sha256_string(char *, size_t, char outputBuffer[65]);
+
 int fio__sha256_file(FILE *const, char outputBuffer[65]);
 
 #endif // FILE_IO_H_

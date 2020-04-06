@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "logger.h"
+#include "server.h"
 #include <assert.h>
 #include <errno.h>
 #include <stdint.h>
@@ -43,27 +44,41 @@ int utils_array_rcv_init(struct utils_array_rcv_data_t *this) {
     return 0;
 }
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, char *buffer) {
+int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct server__message_t *buffer) {
     assert(this->size <= this->_allocated);
-
-    // not enough allocated memory, reallocate with 50% more memory.
-    if (this->size == this->_allocated) {
-        uint32_t new = this->_allocated + this->_allocated / 2;
-        struct utils__rcv_data_t *temp = (struct utils__rcv_data_t *)realloc(this->content, new * sizeof(struct utils__rcv_data_t));
-        if (temp == NULL) {
-            log_printf(LOG_DEBUG, "Reallocation failed for utils_rcv_strcut_add: %s", strerror(errno));
-            return -1;
+    struct server__message_t *found = utils_array_rcv_find(this, sockd);
+    if (found) {
+        *found = *buffer;
+    } else {
+        // not enough allocated memory, reallocate with 50% more memory.
+        if (this->size == this->_allocated) {
+            uint32_t new = this->_allocated + this->_allocated / 2;
+            struct utils__rcv_data_t *temp = (struct utils__rcv_data_t *)realloc(this->content, new * sizeof(struct utils__rcv_data_t));
+            if (temp == NULL) {
+                log_printf(LOG_DEBUG, "Reallocation failed for utils_rcv_strcut_add: %s", strerror(errno));
+                return -1;
+            }
+            this->content = temp;
+            this->_allocated = new;
         }
-        this->content = temp;
-        this->_allocated = new;
+
+        struct utils__rcv_data_t *t = &(this->content[this->size]);
+        t->from = sockd;
+        t->data = *buffer;
+        this->size++;
+    }
+    return 0;
+}
+
+struct server__message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *this, int sockd) {
+    // TODO we can use binary search here because sockd are always incremented
+    for (size_t i = 0; i < this->size; i++) {
+        if (this->content[i].from == sockd) {
+            return &this->content[i].data;
+        }
     }
 
-    struct utils__rcv_data_t *t = &(this->content[this->size]);
-    t->from = sockd;
-    strcpy(t->data, buffer);
-    this->size++;
-
-    return 0;
+    return NULL;
 }
 
 int utils_array_rcv_destroy(struct utils_array_rcv_data_t *this) {
@@ -110,15 +125,4 @@ int utils_array_pollfd_destroy(struct utils_array_pollfd_t *this) {
     assert(this->content != NULL);
     free(this->content);
     return 0;
-}
-
-// int utils_search_for_block
-char *utils_array_rcv_find(struct utils_array_rcv_data_t *this, int sockd) {
-    for (size_t i = 0; i < this->size; i++) {
-        if (this->content[i].from == sockd) {
-            return this->content[i].data;
-        }
-    }
-
-    return NULL;
 }

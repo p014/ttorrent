@@ -8,6 +8,21 @@
  */
 enum { SERVER__BLOCK,
        SERVER__NON_BLOCK };
+
+struct server__message_t {
+    uint32_t magic_number;
+    uint64_t block_number;
+    uint8_t message_code;
+    // uint8_t payload[FIO_MAX_BLOCK_SIZE];
+} __attribute__((packed));
+
+struct server__message_payload_t {
+    uint32_t magic_number;
+    uint64_t block_number;
+    uint8_t message_code;
+    uint8_t data[FIO_MAX_BLOCK_SIZE];
+} __attribute__((packed));
+
 /**
  * Create a socket and bind it to INADDR_ANY:port 
  * @param port port to listen * 
@@ -35,7 +50,7 @@ int server__blocking(const int);
  * @param data pointer to the location containing the recieved message
  * @return message to send or NULL if an error ocurred
  */
-char *server__craft_message(char *);
+// char *server__craft_message(struct server__message_t *data, int sockd,);
 
 /**
  * Main function

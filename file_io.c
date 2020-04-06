@@ -297,7 +297,7 @@ int fio_create_torrent_from_metainfo_file(const char *const metainfo_file_name, 
         torrent->peers[i].peer_address[2] = (uint8_t)(addr >> 8);
         torrent->peers[i].peer_address[3] = (uint8_t)(addr >> 0);
 
-        torrent->peers[i].peer_port = ntohs(addr_in->sin_port);
+        torrent->peers[i].peer_port = addr_in->sin_port;
 
         log_printf(LOG_DEBUG, "\t... to %d.%d.%d.%d %d",
                    torrent->peers[i].peer_address[0],

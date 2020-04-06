@@ -12,6 +12,11 @@
     "limits": "c",
     "*.tcc": "c",
     "netdb.h": "c",
-    "enum.h": "c"
-  }
+    "enum.h": "c",
+    "utils.h": "c",
+    "stdint.h": "c",
+    "string.h": "c",
+    "math.h": "c"
+  },
+  "discord.enabled": true
 }

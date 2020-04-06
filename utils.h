@@ -2,6 +2,7 @@
 #define UTILS_H
 #include "enum.h"
 #include "file_io.h"
+#include "server.h"
 #include <poll.h>
 
 /**
@@ -24,8 +25,8 @@ struct utils_array_pollfd_t {
  * Struct to store the data recieved
  */
 struct utils__rcv_data_t {
-    int from;                        // socket
-    char data[RAW_MESSAGE_SIZE + 1]; // data
+    int from;                      // socket
+    struct server__message_t data; // data
 };
 
 struct utils_array_rcv_data_t {
@@ -66,7 +67,7 @@ int utils_array_pollfd_add(struct utils_array_pollfd_t *, const int, const short
  * @return 0 on success or -1 on error. 
  * If the function fails the struct is not modified.
  */
-int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, char *);
+int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct server__message_t *);
 
 /**
  * Free array inside the struct 
@@ -88,7 +89,7 @@ int utils_array_rcv_destroy(struct utils_array_rcv_data_t *);
  * @param socketd socket to find
  * @return pointer to the message recievec on succes or NULL on error
  */
-char *utils_array_rcv_find(struct utils_array_rcv_data_t *, int);
+struct server__message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *, int);
 
 int utils_array_rcv_remove(struct utils_array_rcv_data_t *, int);
 #endif
