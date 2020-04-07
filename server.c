@@ -77,21 +77,25 @@ int server__init_socket(const uint16_t port) {
     // init socket
     int s = socket(AF_INET, SOCK_STREAM, 0);
     if (s < 0) {
+        log_printf(LOG_DEBUG, "Socket failed: %s", strerror(errno));
         return -1;
     }
 
     // set to a non-blocking socket
     if (fcntl(s, F_SETFL, O_NONBLOCK)) {
+        log_printf(LOG_DEBUG, "fcntl failed: %s", strerror(errno));
         return -1;
     }
 
     // bind it!
     if (bind(s, (struct sockaddr *)&hint, sizeof(hint))) {
+        log_printf(LOG_DEBUG, "Bind failed: %s", strerror(errno));
         return -1;
     }
 
     // and listen to incoming connections
     if (listen(s, SERVER__BACKLOG)) {
+        log_printf(LOG_DEBUG, "Listen failed: %s", strerror(errno));
         return -1;
     }
 
@@ -99,9 +103,8 @@ int server__init_socket(const uint16_t port) {
 }
 
 int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
-    struct utils_array_pollfd_t p;            // array to poll
-    struct utils_array_rcv_data_t d;          // array to store the rcv messages
-    struct server__message_payload_t payload; // struct for the payload
+    struct utils_array_pollfd_t p;   // array to poll
+    struct utils_array_rcv_data_t d; // array to store the rcv messages
 
     utils_array_pollfd_init(&p);
     utils_array_rcv_init(&d);
@@ -139,21 +142,22 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
 
                 } else { // read data
 
-                    ssize_t read = recv(t->fd, &payload, RAW_MESSAGE_SIZE, 0);
+                    struct utils_message_payload_t buffer; // struct for the payload
+
+                    ssize_t read = recv_all(t->fd, &buffer, RAW_MESSAGE_SIZE);
 
                     if (read > 0) {
                         log_printf(LOG_INFO, "Got %i bytes from socket %i", read, t->fd);
                         // store the data to use later
-                        utils_array_rcv_add(&d, t->fd, &payload);
+                        utils_array_rcv_add(&d, t->fd, &buffer);
                         t->events = POLLOUT;
                     } else if (read == 0) {
-
                         // remove from polling
                         log_printf(LOG_INFO, "Connection closed on socket %i", t->fd);
                         close(t->fd);
-                        utils_array_pollfd_remove(&p, t->fd);
-                        utils_array_rcv_remove(&d, t->fd);
-
+                        int temp_sock = t->fd;
+                        utils_array_rcv_remove(&d, temp_sock);
+                        utils_array_pollfd_remove(&p, temp_sock);
                     } else {
                         log_printf(LOG_DEBUG, "Error while reading: %s", strerror(errno));
                     }
@@ -162,42 +166,39 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
             } else if (t->revents & POLLOUT) { // if we can send without blocking
                 t->events = POLLIN;
 
-                struct server__message_t *te = utils_array_rcv_find(&d, t->fd);
-                payload.magic_number = te->magic_number;
-                payload.block_number = te->block_number;
-                payload.message_code = te->message_code;
+                struct utils_message_payload_t buffer; // struct for the payload
+                struct utils_message_t *te = utils_array_rcv_find(&d, t->fd);
+                buffer.magic_number = te->magic_number;
+                buffer.block_number = te->block_number;
+                buffer.message_code = te->message_code;
 
-                if (payload.magic_number == MAGIC_NUMBER &&
-                    payload.message_code == MSG_REQUEST &&
-                    payload.block_number < torrent->block_count) {
-
-                    if (torrent->block_map[payload.block_number]) { // check block hash
+                if (buffer.magic_number == MAGIC_NUMBER && buffer.message_code == MSG_REQUEST && buffer.block_number < torrent->block_count) {
+                    if (torrent->block_map[buffer.block_number]) { // check block hash
                         struct fio_block_t block;
 
                         // contruct the payload and send it
-                        log_printf(LOG_INFO, "Sending payload for block %i from socked %i", payload.block_number, t->fd);
-                        payload.message_code = MSG_RESPONSE_OK;
-                        fio_load_block(torrent, payload.block_number, &block);
-                        memcpy(payload.data, block.data, block.size);
+                        log_printf(LOG_INFO, "Sending payload for block %i from socked %i", buffer.block_number, t->fd);
+                        buffer.message_code = MSG_RESPONSE_OK;
+                        fio_load_block(torrent, buffer.block_number, &block);
+                        memcpy(buffer.data, block.data, block.size);
 
-                        if (send(t->fd, &payload, RAW_MESSAGE_SIZE + block.size, 0) == -1) {
-                            log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
-                        } else {
+                        if (send_all(t->fd, &buffer, RAW_MESSAGE_SIZE + block.size) > 0) {
+                            // if (send(t->fd, &buffer, RAW_MESSAGE_SIZE + block.size, 0) == -1) {
                             log_printf(LOG_INFO, "Send sucess");
+                        } else {
+                            log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
                         }
-
                     } else {
                         log_message(LOG_INFO, "Block hash incorrect hash, sending MSG_RESPONSE_NA");
-                        payload.message_code = MSG_RESPONSE_NA;
+                        buffer.message_code = MSG_RESPONSE_NA;
 
-                        if (send(t->fd, &payload, RAW_MESSAGE_SIZE, 0) == -1) {
-                            log_printf(LOG_INFO, "Could not send MSG_RESPONSE_NA: %s", strerror(errno));
-                        } else {
+                        if (send_all(t->fd, &buffer, RAW_MESSAGE_SIZE) > 0) {
                             log_printf(LOG_INFO, "Send sucess");
+                        } else {
+                            log_printf(LOG_INFO, "Could not send MSG_RESPONSE_NA: %s", strerror(errno));
                         }
                     }
-
-                } // check
+                }
 
             } // POLLOUT
 

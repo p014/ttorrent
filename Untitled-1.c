@@ -81,33 +81,58 @@ int client_init(const char *const metainfo) {
             for (uint64_t k = 0; k < t.block_count; k++) {
                 if (!t.block_map[k]) { // if hash is incorrect
                     struct utils_message_t message;
+                    struct fio_block_t block;
                     message.magic_number = MAGIC_NUMBER;
                     message.message_code = MSG_REQUEST;
                     message.block_number = k;
 
                     log_printf(LOG_INFO, "requesting magic_number = %x, message_code = %u, block_number = %lu", message.magic_number, message.message_code, message.block_number);
 
-                    send_all(s, &message, RAW_MESSAGE_SIZE);
+                    send(s, &message, RAW_MESSAGE_SIZE, 0);
                     // recieve block
-                    char buffer[RAW_MESSAGE_SIZE];
-                    recv_all(s, &buffer, RAW_MESSAGE_SIZE);
+                    char buffer[RAW_MESSAGE_SIZE + FIO_MAX_BLOCK_SIZE];
+                    char *buffertart = buffer;
+                    char tempbuffer[FIO_MAX_BLOCK_SIZE];
+                    block.size = fio_get_block_size(&t, k);
+                    ssize_t c;
+                    uint64_t partial_size = 0;
+                    while ((c = recv(s, &tempbuffer, RAW_MESSAGE_SIZE + block.size, 0)) > 0) {
+                        memcpy(buffertart, tempbuffer, (uint64_t)c);
+                        buffertart += c;
+                        partial_size += (uint64_t)c;
+                        if (RAW_MESSAGE_SIZE + block.size == partial_size || RAW_MESSAGE_SIZE == partial_size)
+                            break;
+                    }
 
-                    struct utils_message_t *response_msg = (struct utils_message_t *)buffer;
-                    log_printf(LOG_INFO, "Recieved magic_number = %x, message_code = %u, block_number = %lu ", response_msg->magic_number, response_msg->message_code, response_msg->block_number);
+                    struct utils_message_payload_t *response = (struct utils_message_payload_t *)buffer;
+                    log_printf(LOG_INFO, "Recieved %lu bytes, magic_number = %x, message_code = %u, block_number = %lu ", partial_size, response->magic_number, response->message_code, response->block_number);
 
-                    if (response_msg->magic_number == MAGIC_NUMBER) {
-                        if (response_msg->message_code == MSG_RESPONSE_OK && response_msg->block_number == k) {
-                            log_printf(LOG_INFO, "Response is correct!");
-                            struct fio_block_t block;
-                            block.size = fio_get_block_size(&t, k);
-                            recv_all(s, &block.data, block.size);
+                    // check response
+                    if (c > 0) {
+                        if (response->magic_number == MAGIC_NUMBER) {
+                            if (response->message_code == MSG_RESPONSE_OK && response->block_number == k) {
+                                log_printf(LOG_INFO, "Response is correct!");
+                                memcpy(block.data, response->data, block.size);
 
-                            if (fio_store_block(&t, k, &block)) {
-                                log_printf(LOG_DEBUG, "Failed to store block %i: %s", k, strerror(errno));
+                                if (fio_store_block(&t, k, &block)) {
+                                    log_printf(LOG_DEBUG, "Failed to store block %i: %s", k, strerror(errno));
+                                } else {
+                                    log_printf(LOG_DEBUG, "Store block %i", k);
+                                }
+
+                            } else if (response->message_code == MSG_RESPONSE_NA) {
+                                log_printf(LOG_DEBUG, "Block %i not available from peer  %s %u", k, ip_address, ntohs(t.peers[i].peer_port));
+                                continue;
                             } else {
-                                log_printf(LOG_DEBUG, "Store block %i", k);
+                                log_message(LOG_DEBUG, "Response Error");
+                                return -1;
                             }
-                        }
+                        } // message
+
+                    } else if (c == 0) {
+                        log_printf(LOG_DEBUG, "Remote server closed connection");
+                    } else {
+                        log_printf(LOG_DEBUG, "Error while recieving: %s", strerror(errno));
                     }
 
                 } // block hash

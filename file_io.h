@@ -159,6 +159,7 @@ struct fio__metainfo_t {
  * Create a metainfo from a file 
  */
 int fio_create_metainfo(char *);
+
 int fio__writemetainfo(char *, struct fio__metainfo_t *);
 
 /**

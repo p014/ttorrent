@@ -16,7 +16,10 @@
     "utils.h": "c",
     "stdint.h": "c",
     "string.h": "c",
-    "math.h": "c"
+    "math.h": "c",
+    "inet.h": "c",
+    "unistd.h": "c",
+    "poll.h": "c"
   },
   "discord.enabled": true
 }

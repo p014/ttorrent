@@ -3,18 +3,6 @@
 #include "file_io.h"
 #include <stdint.h>
 
-struct server__message_t {
-    uint32_t magic_number;
-    uint64_t block_number;
-    uint8_t message_code;
-} __attribute__((packed));
-
-struct server__message_payload_t {
-    uint32_t magic_number;
-    uint64_t block_number;
-    uint8_t message_code;
-    uint8_t data[FIO_MAX_BLOCK_SIZE];
-} __attribute__((packed));
 
 /**
  * Create a socket and bind it to INADDR_ANY:port 

@@ -56,7 +56,7 @@ int utils_array_pollfd_init(struct utils_array_pollfd_t *this) {
     return 0;
 }
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct server__message_payload_t *__restrict buffer) {
+int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct utils_message_payload_t *__restrict buffer) {
     assert(this->size <= this->_allocated);
 
     // TODO Binary search?
@@ -168,7 +168,7 @@ struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *this, int so
     return NULL;
 }
 
-struct server__message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *this, int sockd) {
+struct utils_message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *this, int sockd) {
     // TODO use binary search?
     for (size_t i = 0; i < this->size; i++) {
         if (this->content[i].from == sockd) {
@@ -189,4 +189,32 @@ int utils_array_pollfd_destroy(struct utils_array_pollfd_t *this) {
     assert(this->content != NULL);
     free(this->content);
     return 0;
+}
+
+ssize_t send_all(int socket, void *buffer, size_t length) {
+    char *ptr = (char *)buffer;
+    size_t total_lenth = 0;
+    while (length > 0) {
+        ssize_t i = send(socket, ptr, length, 0);
+        if (i < 1)
+            return i;
+        ptr += (uint64_t)i;
+        length -= (size_t)i;
+        total_lenth += (size_t)i;
+    }
+    return (ssize_t)total_lenth;
+}
+
+ssize_t recv_all(int socket, void *buffer, size_t length) {
+    char *ptr = (char *)buffer;
+    size_t total_lenth = 0;
+    while (length > 0) {
+        ssize_t i = recv(socket, ptr, length, 0);
+        if (i < 1)
+            return i;
+        ptr += (uint64_t)i;
+        length -= (size_t)i;
+        total_lenth += (size_t)i;
+    }
+    return (ssize_t)total_lenth;
 }
