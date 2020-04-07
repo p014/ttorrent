@@ -77,6 +77,9 @@ int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct server__mes
 int utils_array_pollfd_destroy(struct utils_array_pollfd_t *);
 
 int utils_array_pollfd_remove(struct utils_array_pollfd_t *, int);
+
+struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *, int);
+
 /**
  * Free array inside the struct 
  * @param this struct to be freed

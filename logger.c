@@ -9,6 +9,7 @@
 #include "logger.h"
 
 static enum log_level_e current_log_level = LOG_INFO; ///< Global variable defining the current log level.
+static unsigned long LOG_COUNT = 1;                   ///< Global variable to keep count of the logs
 
 void set_log_level(const enum log_level_e log_level) {
     assert(log_level >= LOG_NONE);
@@ -19,12 +20,12 @@ void set_log_level(const enum log_level_e log_level) {
 void log_message(const enum log_level_e log_level, const char *const message) {
     assert(log_level > LOG_NONE);
     assert(message != NULL);
-
     if (log_level > current_log_level) {
         return;
     }
 
-    (void)fprintf(stderr, "%s\n", message);
+    (void)fprintf(stderr, "[%lu]: %s\n", LOG_COUNT, message);
+    LOG_COUNT++;
 }
 
 void log_printf(const enum log_level_e log_level, const char *const format, ...) {
@@ -38,8 +39,10 @@ void log_printf(const enum log_level_e log_level, const char *const format, ...)
     va_list ap;
 
     va_start(ap, format);
+    fprintf(stderr, "[%lu]: ", LOG_COUNT);
     (void)vfprintf(stderr, format, ap);
     va_end(ap);
 
     (void)fputs("\n", stderr);
+    LOG_COUNT++;
 }
