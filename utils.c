@@ -44,11 +44,14 @@ int utils_array_rcv_init(struct utils_array_rcv_data_t *this) {
     return 0;
 }
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct server__message_t *buffer) {
+int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct server__message_payload_t *buffer) {
     assert(this->size <= this->_allocated);
     struct server__message_t *found = utils_array_rcv_find(this, sockd);
     if (found) {
-        *found = *buffer;
+        // *found = *buffer;
+        found->block_number = buffer->block_number;
+        found->magic_number = buffer->magic_number;
+        found->message_code = buffer->message_code;
     } else {
         // not enough allocated memory, reallocate with 50% more memory.
         if (this->size == this->_allocated) {
@@ -64,7 +67,9 @@ int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct s
 
         struct utils__rcv_data_t *t = &(this->content[this->size]);
         t->from = sockd;
-        t->data = *buffer;
+        t->data.block_number = buffer->block_number;
+        t->data.magic_number = buffer->magic_number;
+        t->data.message_code = buffer->message_code;
         this->size++;
     }
     return 0;
@@ -79,6 +84,21 @@ struct server__message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *th
     }
 
     return NULL;
+}
+
+int utils_array_rcv_remove(struct utils_array_rcv_data_t *this, int fd) {
+    // TODO Use binary search
+    for (size_t i = 0; i < this->size; i++) {
+        if (this->content[i].from == fd) {
+            log_printf(LOG_DEBUG, "Deleted socket %i from the msg array", fd);
+            for (size_t k = i; k < this->size - 1; k++) {
+                this->content[k] = this->content[k + 1];
+            }
+            this->size--;
+            return 0;
+        }
+    }
+    return -1;
 }
 
 int utils_array_rcv_destroy(struct utils_array_rcv_data_t *this) {
@@ -119,6 +139,20 @@ int utils_array_pollfd_add(struct utils_array_pollfd_t *this, const int sockd, c
     this->size++;
 
     return 0;
+}
+int utils_array_pollfd_remove(struct utils_array_pollfd_t *this, int fd) {
+    // TODO Use binary search
+    for (size_t i = 0; i < this->size; i++) {
+        if (this->content[i].fd == fd) {
+            log_printf(LOG_DEBUG, "Deleted socket %i from polling", fd);
+            for (size_t k = i; k < this->size - 1; k++) {
+                this->content[k] = this->content[k + 1];
+            }
+            this->size--;
+            return 0;
+        }
+    }
+    return -1;
 }
 
 int utils_array_pollfd_destroy(struct utils_array_pollfd_t *this) {

@@ -67,7 +67,7 @@ int utils_array_pollfd_add(struct utils_array_pollfd_t *, const int, const short
  * @return 0 on success or -1 on error. 
  * If the function fails the struct is not modified.
  */
-int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct server__message_t *);
+int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct server__message_payload_t *);
 
 /**
  * Free array inside the struct 
@@ -76,6 +76,7 @@ int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct server__mes
  */
 int utils_array_pollfd_destroy(struct utils_array_pollfd_t *);
 
+int utils_array_pollfd_remove(struct utils_array_pollfd_t *, int);
 /**
  * Free array inside the struct 
  * @param this struct to be freed
@@ -92,4 +93,5 @@ int utils_array_rcv_destroy(struct utils_array_rcv_data_t *);
 struct server__message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *, int);
 
 int utils_array_rcv_remove(struct utils_array_rcv_data_t *, int);
+
 #endif

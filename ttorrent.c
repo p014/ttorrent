@@ -21,12 +21,8 @@ int main(int argc, char **argv) {
     log_printf(LOG_DEBUG, "\n");
 
     if (argc == 1) { // no params
-        char help_message[] = "\
-            Usage:\n\
-            Download a file: ttorrent file.metainfo\n\
-            Upload a file: ttorrent -l 8080 file.metainfo\n\
-            Create metainfo: ttorrent -c file\n\
-            ";
+        char help_message[] =
+            "Usage:\nDownload a file: ttorrent file.metainfo\nUpload a file: ttorrent -l 8080 file.metainfo\nCreate metainfo: ttorrent -c file\n";
         log_printf(LOG_INFO, "%s", help_message);
         exit(EXIT_SUCCESS);
     }

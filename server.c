@@ -127,11 +127,11 @@ int server__init_socket(const uint16_t port, const int blocking) {
 #define BUFFER_SIZE 1
 
 int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
-    struct utils_array_pollfd_t p = {0};
-    struct utils_array_rcv_data_t data = {0};       // array to store the rcv messages
-    struct server__message_t buffer = {0};          // buffer to store the message
-    struct server__message_payload_t payload = {0}; // struct for the payload
-    struct fio_block_t block = {0};
+    struct utils_array_pollfd_t p;            // array to poll
+    struct utils_array_rcv_data_t data;       // array to store the rcv messages
+    struct server__message_payload_t payload; // struct for the payload
+    struct fio_block_t block;
+    // struct server__message_t payload = {0};          // buffer to store the message
 
     if (utils_array_pollfd_init(&p)) {
         log_printf(LOG_DEBUG, "Failed to initiate server__poll_array_t: %s", strerror(errno));
@@ -144,7 +144,8 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
         log_printf(LOG_DEBUG, "Failed to initiate server__poll_array_t: %s", strerror(errno));
         return -1;
     }
-    // debug info
+    // Print contents of the struct
+    /* 
     log_printf(LOG_DEBUG, "Contents of the torrent struct");
     log_printf(LOG_DEBUG, "\tmetainfo_file_name: %s", torrent->metainfo_file_name);
     log_printf(LOG_DEBUG, "\tdownloaded_file_stream: %x", torrent->downloaded_file_stream);
@@ -159,6 +160,7 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
     for (size_t i = 0; i < torrent->peer_count; i++) {
         log_printf(LOG_DEBUG, "\t\tpeers: %x", torrent->peers[i]);
     }
+    //*/
 
     // Main loop
     while (1) {
@@ -208,16 +210,20 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                     // followed by the raw block data.
                     // c. Otherwise, respond with a message signaling the unavailability of the block.
 
-                    ssize_t read = recv(t->fd, &buffer, RAW_MESSAGE_SIZE, 0);
+                    log_printf(LOG_DEBUG, "Reading from socket %i", t->fd);
+
+                    ssize_t read = recv(t->fd, &payload, RAW_MESSAGE_SIZE, 0);
                     // mark for POLLOUT
                     t->events = POLLOUT;
 
                     if (read > 0) {
                         log_printf(LOG_DEBUG, "Got %i bytes from socket %i", read, t->fd);
                         // we need to store the data to use later
-                        utils_array_rcv_add(&data, t->fd, &buffer);
+                        utils_array_rcv_add(&data, t->fd, &payload);
                     } else if (read == 0) {
                         log_printf(LOG_DEBUG, "Connection closed on socket %i", t->fd);
+                        // remove from polling
+                        utils_array_pollfd_remove(&p, t->fd);
                         if (close(t->fd)) {
                             log_printf(LOG_DEBUG, "Error while closing socket %i: %s", t->fd, strerror(errno));
                             // ignore error
@@ -231,30 +237,33 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                 }
             } // if POLLIN, we can send without blocking
             else if (t->revents & POLLOUT) {
+                t->events = POLLIN;
+
                 log_printf(LOG_DEBUG, "Can send from %i", t->fd);
+                struct server__message_t *te = utils_array_rcv_find(&data, t->fd);
+                payload.block_number = te->block_number;
+                payload.message_code = te->message_code;
+                payload.magic_number = te->magic_number;
 
-                buffer = *utils_array_rcv_find(&data, t->fd);
-
-                if (buffer.magic_number == MAGIC_NUMBER) {
+                if (payload.magic_number == MAGIC_NUMBER) {
 
                     log_message(LOG_DEBUG, "Correct magic number");
 
-                    if (buffer.message_code == MSG_REQUEST) {
+                    if (payload.message_code == MSG_REQUEST) {
 
-                        log_printf(LOG_DEBUG, "Got request for block %u", buffer.block_number);
+                        log_printf(LOG_DEBUG, "Got request for block %u", payload.block_number);
 
-                        if (buffer.block_number < torrent->block_count) { // check bounds
+                        if (payload.block_number < torrent->block_count) { // check bounds
 
-                            payload = *(struct server__message_payload_t *)&buffer;
-
-                            if (torrent->block_map[buffer.block_number]) { // check block hash
+                            if (torrent->block_map[payload.block_number]) { // check block hash
                                 log_message(LOG_DEBUG, "Block has correct hash");
                                 // contruct the payload
                                 payload.message_code = MSG_RESPONSE_OK;
-                                fio_load_block(torrent, buffer.block_number, &block);
+                                fio_load_block(torrent, payload.block_number, &block);
                                 memcpy(payload.data, block.data, block.size);
 
                                 // finally send it
+                                log_printf(LOG_DEBUG, "Sending payload for block %i from socked %i", payload.block_number, t->fd);
                                 if (send(t->fd, &payload, RAW_MESSAGE_SIZE + block.size, 0) == -1) {
                                     log_printf(LOG_DEBUG, "Could not send the payload: %s", strerror(errno));
                                 }
@@ -269,7 +278,6 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                             }
 
                             // mark for reading
-                            t->events = POLLOUT;
 
                         } else {
                             log_message(LOG_DEBUG, "Block index is out of bounds");
