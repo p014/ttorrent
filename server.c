@@ -1,8 +1,3 @@
-#include "server.h"
-#include "enum.h"
-#include "file_io.h"
-#include "logger.h"
-#include "utils.h"
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
@@ -12,6 +7,12 @@
 #include <sys/fcntl.h>
 #include <sys/poll.h>
 #include <sys/unistd.h>
+
+#include "enum.h"
+#include "file_io.h"
+#include "logger.h"
+#include "server.h"
+#include "utils.h"
 
 #define TIME_TO_POLL -1 //  wait forever
 
@@ -99,11 +100,11 @@ int server__init_socket(const uint16_t port) {
 
 int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
     struct utils_array_pollfd_t p;            // array to poll
-    struct utils_array_rcv_data_t data;       // array to store the rcv messages
+    struct utils_array_rcv_data_t d;          // array to store the rcv messages
     struct server__message_payload_t payload; // struct for the payload
 
     utils_array_pollfd_init(&p);
-    utils_array_rcv_init(&data);
+    utils_array_rcv_init(&d);
 
     utils_array_pollfd_add(&p, sockd, POLLIN);
 
@@ -143,7 +144,7 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                     if (read > 0) {
                         log_printf(LOG_INFO, "Got %i bytes from socket %i", read, t->fd);
                         // store the data to use later
-                        utils_array_rcv_add(&data, t->fd, &payload);
+                        utils_array_rcv_add(&d, t->fd, &payload);
                         t->events = POLLOUT;
                     } else if (read == 0) {
 
@@ -151,7 +152,7 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                         log_printf(LOG_INFO, "Connection closed on socket %i", t->fd);
                         close(t->fd);
                         utils_array_pollfd_remove(&p, t->fd);
-                        utils_array_rcv_remove(&data, t->fd);
+                        utils_array_rcv_remove(&d, t->fd);
 
                     } else {
                         log_printf(LOG_DEBUG, "Error while reading: %s", strerror(errno));
@@ -161,7 +162,7 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
             } else if (t->revents & POLLOUT) { // if we can send without blocking
                 t->events = POLLIN;
 
-                struct server__message_t *te = utils_array_rcv_find(&data, t->fd);
+                struct server__message_t *te = utils_array_rcv_find(&d, t->fd);
                 payload.magic_number = te->magic_number;
                 payload.block_number = te->block_number;
                 payload.message_code = te->message_code;
@@ -205,6 +206,6 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
     } // while loop
 
     utils_array_pollfd_destroy(&p);
-    utils_array_rcv_destroy(&data);
+    utils_array_rcv_destroy(&d);
     return 0;
 }
