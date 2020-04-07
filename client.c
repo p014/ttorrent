@@ -114,7 +114,15 @@ int client_init(const char *const metainfo) {
                             struct fio_block_t block;
                             log_printf(LOG_INFO, "Response is correct!");
                             block.size = fio_get_block_size(&t, k);
-                            recv_all(s, &block.data, block.size);
+                            recv_count = recv_all(s, &block.data, block.size);
+
+                            if (recv_count == 0) {
+                                log_printf(LOG_DEBUG, "Connection closed");
+                                break; // next peer
+                            } else if (recv_count == -1) {
+                                log_printf(LOG_DEBUG, "Could not recieve %s", strerror(errno));
+                                break; // next peer
+                            }
 
                             if (fio_store_block(&t, k, &block)) {
                                 log_printf(LOG_DEBUG, "Failed to store block %i: %s", k, strerror(errno));
