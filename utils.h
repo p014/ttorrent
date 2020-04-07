@@ -71,7 +71,7 @@ int utils_array_rcv_init(struct utils_array_rcv_data_t *);
  */
 int utils_array_pollfd_add(struct utils_array_pollfd_t *, const int, const short);
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct utils_message_payload_t *);
+int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct utils_message_t *);
 
 /**
  * Find inside the array the data recieved from sockd

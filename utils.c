@@ -56,7 +56,7 @@ int utils_array_pollfd_init(struct utils_array_pollfd_t *this) {
     return 0;
 }
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct utils_message_payload_t *__restrict buffer) {
+int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct utils_message_t *__restrict buffer) {
     assert(this->size <= this->_allocated);
 
     // TODO Binary search?

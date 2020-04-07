@@ -36,8 +36,8 @@ char client__is_completed(struct fio_torrent_t *const t) {
 
 int client_init(const char *const metainfo) {
     struct fio_torrent_t t;
-    // get original filename
 
+    // get original filename
     char *filename = utils_original_file_name(metainfo);
 
     if (!filename) {
@@ -59,14 +59,15 @@ int client_init(const char *const metainfo) {
 
     for (uint64_t i = 0; i < t.peer_count; i++) {
         int s = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in srv_addr;
+        char ip_address[20];
+
         if (s < 0) {
             log_printf(LOG_DEBUG, "Failed to create a socket %s", strerror(errno));
             return -1;
         }
-        struct sockaddr_in srv_addr;
-        char ip_address[20];
-        sprintf(ip_address, "%d.%d.%d.%d", t.peers[i].peer_address[0], t.peers[i].peer_address[1], t.peers[i].peer_address[2], t.peers[i].peer_address[3]);
 
+        sprintf(ip_address, "%d.%d.%d.%d", t.peers[i].peer_address[0], t.peers[i].peer_address[1], t.peers[i].peer_address[2], t.peers[i].peer_address[3]);
         log_printf(LOG_DEBUG, "Connecting to %s %u", ip_address, ntohs(t.peers[i].peer_port));
         srv_addr.sin_family = AF_INET;
         srv_addr.sin_addr.s_addr = inet_addr(ip_address);
@@ -76,29 +77,42 @@ int client_init(const char *const metainfo) {
             log_printf(LOG_INFO, "Connection failed for peer %s %u (%s) trying next peer.", ip_address, ntohs(t.peers[i].peer_port), strerror(errno));
 
         } else {
-
             log_printf(LOG_DEBUG, "Connected! Socket %i", s);
             for (uint64_t k = 0; k < t.block_count; k++) {
                 if (!t.block_map[k]) { // if hash is incorrect
                     struct utils_message_t message;
+                    char buffer[RAW_MESSAGE_SIZE];
+                    struct utils_message_t *response_msg;
+                    ssize_t recv_count;
+
                     message.magic_number = MAGIC_NUMBER;
                     message.message_code = MSG_REQUEST;
                     message.block_number = k;
 
                     log_printf(LOG_INFO, "requesting magic_number = %x, message_code = %u, block_number = %lu", message.magic_number, message.message_code, message.block_number);
 
-                    send_all(s, &message, RAW_MESSAGE_SIZE);
-                    // recieve block
-                    char buffer[RAW_MESSAGE_SIZE];
-                    recv_all(s, &buffer, RAW_MESSAGE_SIZE);
+                    if (send_all(s, &message, RAW_MESSAGE_SIZE) < 0) {
+                        log_printf(LOG_DEBUG, "Could not send %s", strerror(errno));
+                        break; // try next peer
+                    }
 
-                    struct utils_message_t *response_msg = (struct utils_message_t *)buffer;
+                    // recieve block
+                    recv_count = recv_all(s, &buffer, RAW_MESSAGE_SIZE);
+                    if (recv_count == 0) {
+                        log_printf(LOG_DEBUG, "Connection closed");
+                        break; // next peer
+                    } else if (recv_count == -1) {
+                        log_printf(LOG_DEBUG, "Could not recieve %s", strerror(errno));
+                        break; // next peer
+                    }
+
+                    response_msg = (struct utils_message_t *)buffer;
                     log_printf(LOG_INFO, "Recieved magic_number = %x, message_code = %u, block_number = %lu ", response_msg->magic_number, response_msg->message_code, response_msg->block_number);
 
                     if (response_msg->magic_number == MAGIC_NUMBER) {
                         if (response_msg->message_code == MSG_RESPONSE_OK && response_msg->block_number == k) {
-                            log_printf(LOG_INFO, "Response is correct!");
                             struct fio_block_t block;
+                            log_printf(LOG_INFO, "Response is correct!");
                             block.size = fio_get_block_size(&t, k);
                             recv_all(s, &block.data, block.size);
 
@@ -124,5 +138,7 @@ int client_init(const char *const metainfo) {
         log_printf(LOG_DEBUG, "Error while destroying the torrent struct: ", strerror(errno));
         return -1;
     }
+
+    log_printf(LOG_DEBUG, "Finished");
     return 0;
 }
