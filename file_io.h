@@ -157,6 +157,8 @@ struct fio__metainfo_t {
 
 /**
  * Create a metainfo from a file 
+ * @param file_name path to the file to create a torrent file from
+ * @return 0 on succes -1 on error
  */
 int fio_create_metainfo(char *);
 
@@ -165,7 +167,6 @@ int fio__writemetainfo(char *, struct fio__metainfo_t *);
 /**
 * Create a SHA-256 hash from the input data
 * https://stackoverflow.com/questions/2262386/generate-sha256-with-openssl-and-c
-* modified by Pablo
 */
 int fio__sha256_string(char *, size_t, char outputBuffer[65]);
 

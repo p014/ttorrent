@@ -9,6 +9,7 @@
  * Structure to store the messages from the client or server
  * Disable structure packing so we can use it as a buffer for recieving messages.
  * */
+
 struct utils_message_t {
     uint32_t magic_number;
     uint64_t block_number;
@@ -31,18 +32,18 @@ struct utils__rcv_data_t {
 };
 
 struct utils_array_rcv_data_t {
-    struct utils__rcv_data_t *__restrict content;
-    uint32_t size;       // number of elements
-    uint32_t _allocated; // allocated but empty
+    struct utils__rcv_data_t *__restrict content; // array
+    uint32_t size;                                // number of elements
+    uint32_t _allocated;                          // real size of the array
 };
 
 /**
  * Struct to manage the pollfd array 
  */
 struct utils_array_pollfd_t {
-    struct pollfd *__restrict content;
-    uint32_t size;       // number of elements
-    uint32_t _allocated; // allocated but empty
+    struct pollfd *__restrict content; // array
+    uint32_t size;                     // number of elements
+    uint32_t _allocated;               // real size of the array
 };
 
 /**
@@ -50,16 +51,16 @@ struct utils_array_pollfd_t {
  * @param metainfo string with .ttorrent extension 
  * @return pointer to the string without .ttorrent or NULL if error
  */
-char *utils_original_file_name(const char *const);
+char *utils_original_file_name(const char *const metainfo);
 
 /**
  * Init utils_array_pollfd_t with an array of 4 elements.
  * @param this pointer to the structure
  * @return 0 if no error or -1 on error
  */
-int utils_array_pollfd_init(struct utils_array_pollfd_t *);
+int utils_array_pollfd_init(struct utils_array_pollfd_t *this);
 
-int utils_array_rcv_init(struct utils_array_rcv_data_t *);
+int utils_array_rcv_init(struct utils_array_rcv_data_t *this);
 
 /**
  * Add socked and events to the array of pollfd
@@ -69,9 +70,9 @@ int utils_array_rcv_init(struct utils_array_rcv_data_t *);
  * @return 0 on success or -1 on error. 
  * If the function fails the struct is not modified.
  */
-int utils_array_pollfd_add(struct utils_array_pollfd_t *, const int, const short);
+int utils_array_pollfd_add(struct utils_array_pollfd_t *this, const int sockd, const short event);
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct utils_message_t *);
+int utils_array_rcv_add(struct utils_array_rcv_data_t *this, const int sockd, const struct utils_message_t *const data);
 
 /**
  * Find inside the array the data recieved from sockd
@@ -79,9 +80,9 @@ int utils_array_rcv_add(struct utils_array_rcv_data_t *, int, struct utils_messa
  * @param socketd socket to find
  * @return pointer to the message recievec on succes or NULL on error
  */
-struct utils_message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *, int);
+struct utils_message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *this, const int sockd);
 
-struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *, int);
+struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *this, const int sockd);
 
 /**
  * Remove from the array
@@ -89,21 +90,29 @@ struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *, int);
  * @param socketd socket to remove
  * @return 0 on succes -1 on error
  */
-int utils_array_pollfd_remove(struct utils_array_pollfd_t *, int);
+int utils_array_pollfd_remove(struct utils_array_pollfd_t *this, const int sockd);
 
-int utils_array_rcv_remove(struct utils_array_rcv_data_t *, int);
+int utils_array_rcv_remove(struct utils_array_rcv_data_t *, const int sockd);
 
 /**
  * Free array inside the struct 
  * @param this struct to be freed
  * @return 0 on success or -1 on error
  */
-int utils_array_pollfd_destroy(struct utils_array_pollfd_t *);
+int utils_array_pollfd_destroy(struct utils_array_pollfd_t *this);
 
-int utils_array_rcv_destroy(struct utils_array_rcv_data_t *);
+int utils_array_rcv_destroy(struct utils_array_rcv_data_t *this);
 
-// int utils_send_all(const int s, const int len, char *buff);
-ssize_t send_all(int socket, void *buffer, size_t length);
-ssize_t recv_all(int socket, void *buffer, size_t length);
+/**
+ * Wrappers for send and recieving fragmented data 
+ * https://stackoverflow.com/questions/13479760/c-socket-recv-and-send-all-data
+ * @param socket descriptor to send or recieve data from
+ * @param buffer Buffer containing the data to send
+ * @param lenght of the buffer
+ * @return Same behavior as the unwrapped versions 
+ */
+ssize_t utils_send_all(int socket, void *buffer, size_t length);
+
+ssize_t utils_recv_all(int socket, void *buffer, size_t length);
 
 #endif

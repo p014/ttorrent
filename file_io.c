@@ -432,7 +432,7 @@ int fio_store_block(struct fio_torrent_t *const torrent, const uint64_t block_nu
         errno = EINVAL;
         return r1;
     }
-
+#if !__TEST_MODE__ // Disable writting to disk for test mode
     const uint64_t offset64 = block_number * FIO_MAX_BLOCK_SIZE;
 
     const off_t offset = (off_t)offset64;
@@ -453,7 +453,9 @@ int fio_store_block(struct fio_torrent_t *const torrent, const uint64_t block_nu
     if (r3 < block->size) {
         return -1;
     }
-
+#else
+    log_printf(LOG_DEBUG, "TEST MODE ENABLED, DISABLED WRITTING TO DISK!");
+#endif
     torrent->block_map[block_number] = 1;
 
     return 0;
@@ -473,6 +475,7 @@ int fio_destroy_torrent(struct fio_torrent_t *const torrent) {
 
     return fclose(torrent->downloaded_file_stream);
 }
+
 int fio__sha256_file(FILE *const f, char outputBuffer[65]) {
 
     unsigned char hash[SHA256_DIGEST_LENGTH];
@@ -517,6 +520,7 @@ int fio__sha256_string(char *input, size_t len, char outputBuffer[65]) {
     return 0;
 }
 
+#define PEERCOUNT 20
 int fio__writemetainfo(char *file_name, struct fio__metainfo_t *info) {
     /* file format
     #SHA-256 of the file
@@ -536,7 +540,7 @@ int fio__writemetainfo(char *file_name, struct fio__metainfo_t *info) {
 
     fprintf(out, "#Size\n%li\n", info->size);
 
-    fprintf(out, "#Peer count is\n%i\n", 3); // need to edit
+    fprintf(out, "#Peer count is\n%i\n", PEERCOUNT); // 20 peers from port 8080 to 8099
 
     fprintf(out, "#SHA-256, number of blocks is %li\n", info->block_count);
 
@@ -544,8 +548,11 @@ int fio__writemetainfo(char *file_name, struct fio__metainfo_t *info) {
         fprintf(out, "%s\n", info->block_sha256[i].hash);
     }
 
-    // default peer
-    fprintf(out, "#Peers\nlocalhost:8080\n127.0.0.1:8081\nlocalhost:8082");
+    // default peer,
+    fprintf(out, "#Peers\n");
+    for (ssize_t i = 0; i < PEERCOUNT; i++) {
+        fprintf(out, "localhost:%li\n", 8080 + i);
+    }
 
     fclose(out);
     return 0;

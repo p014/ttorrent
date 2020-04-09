@@ -140,7 +140,7 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
 
                 } else { // read data
                     struct utils_message_t buffer;
-                    ssize_t read = recv_all(t->fd, &buffer, RAW_MESSAGE_SIZE);
+                    ssize_t read = utils_recv_all(t->fd, &buffer, RAW_MESSAGE_SIZE);
 
                     if (read > 0) {
                         log_printf(LOG_INFO, "Got %i bytes from socket %i", read, t->fd);
@@ -162,44 +162,46 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
             } else if (t->revents & POLLOUT) { // if we can send without blocking
                 t->events = POLLIN;
                 struct utils_message_payload_t payload;
-                struct utils_message_t *te = utils_array_rcv_find(&d, t->fd);
+                struct utils_message_t *te = utils_array_rcv_find(&d, t->fd); // find message recieved
 
                 if (te == NULL) {
                     log_printf(LOG_DEBUG, "No messages recieved from %i, socket marked for POLLIN", t->fd);
                     continue;
                 }
 
-                payload.magic_number = te->magic_number;
-                payload.block_number = te->block_number;
-                payload.message_code = te->message_code;
+                if (te->magic_number == MAGIC_NUMBER) { // check recieved message
+                    if (te->message_code == MSG_REQUEST && te->block_number < torrent->block_count) {
+                        if (torrent->block_map[payload.block_number]) { // check block hash
+                            struct fio_block_t block;
 
-                if (payload.magic_number == MAGIC_NUMBER && payload.message_code == MSG_REQUEST && payload.block_number < torrent->block_count) {
-                    if (torrent->block_map[payload.block_number]) { // check block hash
-                        struct fio_block_t block;
+                            // contruct the payload and send it
+                            log_printf(LOG_INFO, "Sending payload for block %i from socked %i", payload.block_number, t->fd);
+                            payload.magic_number = MAGIC_NUMBER;
+                            payload.message_code = MSG_RESPONSE_OK;
+                            payload.block_number = te->block_number;
 
-                        // contruct the payload and send it
-                        log_printf(LOG_INFO, "Sending payload for block %i from socked %i", payload.block_number, t->fd);
-                        payload.message_code = MSG_RESPONSE_OK;
-                        fio_load_block(torrent, payload.block_number, &block);
-                        memcpy(payload.data, block.data, block.size);
+                            fio_load_block(torrent, payload.block_number, &block);
+                            memcpy(payload.data, block.data, block.size);
 
-                        if (send_all(t->fd, &payload, RAW_MESSAGE_SIZE + block.size) > 0) {
-                            log_printf(LOG_INFO, "Send sucess");
+                            if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE + block.size) > 0) {
+                                log_printf(LOG_INFO, "Send sucess");
+                            } else {
+                                log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
+                            }
+
                         } else {
-                            log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
-                        }
+                            log_message(LOG_INFO, "Block hash incorrect hash, sending MSG_RESPONSE_NA");
+                            payload.message_code = MSG_RESPONSE_NA;
 
-                    } else {
-                        log_message(LOG_INFO, "Block hash incorrect hash, sending MSG_RESPONSE_NA");
-                        payload.message_code = MSG_RESPONSE_NA;
-
-                        if (send_all(t->fd, &payload, RAW_MESSAGE_SIZE) > 0) {
-                            log_printf(LOG_INFO, "Send sucess");
-                        } else {
-                            log_printf(LOG_INFO, "Could not send MSG_RESPONSE_NA: %s", strerror(errno));
+                            if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE) > 0) {
+                                log_printf(LOG_INFO, "Send sucess");
+                            } else {
+                                log_printf(LOG_INFO, "Could not send MSG_RESPONSE_NA: %s", strerror(errno));
+                            }
                         }
                     }
                 }
+
             } // POLLOUT
 
         } // foor loop

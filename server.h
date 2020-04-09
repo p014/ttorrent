@@ -3,40 +3,34 @@
 #include "file_io.h"
 #include <stdint.h>
 
-
 /**
  * Create a socket and bind it to INADDR_ANY:port 
  * @param port port to listen * 
  * @return socket descriptor or -1 on error
  */
-int server__init_socket(const uint16_t);
+int server__init_socket(const uint16_t port);
 
 /**
  * Manage a non-blocking socket, must be used after calling server__init_socket
  * @param sockd A descriptor to a non blocking socket 
+ * @param t pointer to struct created with fio_create_torrent_from_metainfo_file
  * @return 0 if no error or -1 if error 
  */
-int server__non_blocking(const int, struct fio_torrent_t *const);
+int server__non_blocking(const int sockd, struct fio_torrent_t *const t);
 
 /**
  * Manage a blocking socket, must be used after calling server__init_socket
  * @param sockd A descriptor to a blocking socket 
  * @return 0 if no error or -1 if error 
  */
-int server__blocking(const int);
-
-/**
- * Handle the incoming messages 
- * @param data pointer to the location containing the recieved message
- * @return message to send or NULL if an error ocurred
- */
-// char *server__craft_message(struct server__message_t *data, int sockd,);
+int server__blocking(const int sockd);
 
 /**
  * Main function
  * @param port the port to listen to 
  * @return 0 if everything went correctly or -1 if error
+ * @param metainfo name of the torrent file, must have the extension .ttorrent and must be in the same directory
  */
-int server_init(const uint16_t, const char *const);
+int server_init(const uint16_t port, const char *const metainfo);
 
 #endif

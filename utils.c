@@ -56,7 +56,7 @@ int utils_array_pollfd_init(struct utils_array_pollfd_t *this) {
     return 0;
 }
 
-int utils_array_rcv_add(struct utils_array_rcv_data_t *this, int sockd, struct utils_message_t *__restrict buffer) {
+int utils_array_rcv_add(struct utils_array_rcv_data_t *this, const int sockd, const struct utils_message_t *const __restrict buffer) {
     assert(this->size <= this->_allocated);
 
     // TODO Binary search?
@@ -127,10 +127,10 @@ int utils_array_pollfd_add(struct utils_array_pollfd_t *this, const int sockd, c
     return 0;
 }
 
-int utils_array_rcv_remove(struct utils_array_rcv_data_t *this, int fd) {
+int utils_array_rcv_remove(struct utils_array_rcv_data_t *this, const int sockd) {
     for (size_t i = 0; i < this->size; i++) {
-        if (this->content[i].from == fd) {
-            log_printf(LOG_DEBUG, "Deleted socket %i from the msg array", fd);
+        if (this->content[i].from == sockd) {
+            log_printf(LOG_DEBUG, "Deleted socket %i from the msg array", sockd);
             for (size_t k = i; k < this->size - 1; k++) {
                 this->content[k] = this->content[k + 1];
             }
@@ -138,14 +138,14 @@ int utils_array_rcv_remove(struct utils_array_rcv_data_t *this, int fd) {
             return 0;
         }
     }
-    log_printf(LOG_DEBUG, "Could not delete socket %i from the msg array", fd);
+    log_printf(LOG_DEBUG, "Could not delete socket %i from the msg array", sockd);
     return -1;
 }
 
-int utils_array_pollfd_remove(struct utils_array_pollfd_t *this, int fd) {
+int utils_array_pollfd_remove(struct utils_array_pollfd_t *this, const int sockd) {
     for (size_t i = 0; i < this->size; i++) {
-        if (this->content[i].fd == fd) {
-            log_printf(LOG_DEBUG, "Deleted socket %i from polling", fd);
+        if (this->content[i].fd == sockd) {
+            log_printf(LOG_DEBUG, "Deleted socket %i from polling", sockd);
             for (size_t k = i; k < this->size - 1; k++) {
                 this->content[k] = this->content[k + 1];
             }
@@ -154,11 +154,11 @@ int utils_array_pollfd_remove(struct utils_array_pollfd_t *this, int fd) {
         }
     }
 
-    log_printf(LOG_DEBUG, "Could not delete socket %i from polling", fd);
+    log_printf(LOG_DEBUG, "Could not delete socket %i from polling", sockd);
     return -1;
 }
 
-struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *this, int sockd) {
+struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *this, const int sockd) {
     // TODO use binary search?
     for (size_t i = 0; i < this->size; i++) {
         if (this->content[i].fd == sockd)
@@ -168,7 +168,7 @@ struct pollfd *utils_array_pollfd_find(struct utils_array_pollfd_t *this, int so
     return NULL;
 }
 
-struct utils_message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *this, int sockd) {
+struct utils_message_t *utils_array_rcv_find(struct utils_array_rcv_data_t *this, const int sockd) {
     // TODO use binary search?
     for (size_t i = 0; i < this->size; i++) {
         if (this->content[i].from == sockd) {
@@ -191,7 +191,7 @@ int utils_array_pollfd_destroy(struct utils_array_pollfd_t *this) {
     return 0;
 }
 
-ssize_t send_all(int socket, void *buffer, size_t length) {
+ssize_t utils_send_all(int socket, void *buffer, size_t length) {
     char *ptr = (char *)buffer;
     size_t total_lenth = 0;
     while (length > 0) {
@@ -205,7 +205,7 @@ ssize_t send_all(int socket, void *buffer, size_t length) {
     return (ssize_t)total_lenth;
 }
 
-ssize_t recv_all(int socket, void *buffer, size_t length) {
+ssize_t utils_recv_all(int socket, void *buffer, size_t length) {
     char *ptr = (char *)buffer;
     size_t total_lenth = 0;
     while (length > 0) {
