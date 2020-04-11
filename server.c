@@ -171,7 +171,7 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
 
                 if (te->magic_number == MAGIC_NUMBER) { // check recieved message
                     if (te->message_code == MSG_REQUEST && te->block_number < torrent->block_count) {
-                        if (torrent->block_map[payload.block_number]) { // check block hash
+                        if (torrent->block_map[te->block_number]) { // check block hash
                             struct fio_block_t block;
 
                             // contruct the payload and send it
