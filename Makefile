@@ -7,7 +7,7 @@ CFLAGS=-std=c99 -g3 -O0 -Wall -pedantic -Wextra -Wshadow -Wpointer-arith \
 
 all:
 	# $(CC) $(CFLAGS) src/pong.c -o bin/pong
-	
+	# test binary
 	# $(CC) $(CFLAGS) test.c file_io.c logger.c client.c client.h server.c server.h utils.h utils.c -o bin/ttorrent -lssl -lcrypto
 	$(CC) $(CFLAGS) ttorrent.c file_io.c logger.c client.c client.h server.c server.h utils.h utils.c -o bin/ttorrent -lssl -lcrypto
 

@@ -12,14 +12,14 @@
 
 struct utils_message_t {
     uint32_t magic_number;
-    uint64_t block_number;
     uint8_t message_code;
+    uint64_t block_number;
 } __attribute__((packed));
 
 struct utils_message_payload_t {
     uint32_t magic_number;
-    uint64_t block_number;
     uint8_t message_code;
+    uint64_t block_number;
     uint8_t data[FIO_MAX_BLOCK_SIZE];
 } __attribute__((packed));
 

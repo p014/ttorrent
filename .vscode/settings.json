@@ -23,5 +23,5 @@
     "client.h": "c",
     "test.h": "c"
   },
-  "discord.enabled": true
+  "discord.enabled": false
 }

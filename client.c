@@ -77,7 +77,7 @@ int client__start(struct fio_torrent_t *t) {
         int s = socket(AF_INET, SOCK_STREAM, 0);
         struct sockaddr_in srv_addr;
         char ip_address[20];
-
+        uint32_t ip;
         if (s < 0) {
             log_printf(LOG_DEBUG, "Failed to create a socket %s", strerror(errno));
             return -1;
@@ -85,8 +85,15 @@ int client__start(struct fio_torrent_t *t) {
 
         sprintf(ip_address, "%d.%d.%d.%d", t->peers[i].peer_address[0], t->peers[i].peer_address[1], t->peers[i].peer_address[2], t->peers[i].peer_address[3]);
         log_printf(LOG_DEBUG, "Connecting to %s %u", ip_address, ntohs(t->peers[i].peer_port));
+        memset(&srv_addr, 0, sizeof srv_addr);
         srv_addr.sin_family = AF_INET;
-        srv_addr.sin_addr.s_addr = inet_addr(ip_address);
+        // srv_addr.sin_addr.s_addr = inet_addr(ip_address);
+        struct fio_peer_information_t *ipp = &t->peers[i];
+        ip = (uint32_t)ipp->peer_address[0] << 24 |
+             (uint32_t)ipp->peer_address[1] << 16 |
+             (uint32_t)ipp->peer_address[2] << 8 |
+             (uint32_t)ipp->peer_address[3] << 0;
+        srv_addr.sin_addr.s_addr = htonl(ip);
         srv_addr.sin_port = t->peers[i].peer_port;
 
         if (!connect(s, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
@@ -94,6 +101,11 @@ int client__start(struct fio_torrent_t *t) {
             client__handle_connection(t, s);
         } else {
             log_printf(LOG_INFO, "Connection failed for peer %s %u (%s) trying next peer.", ip_address, ntohs(t->peers[i].peer_port), strerror(errno));
+        }
+        
+        if (client__is_completed(t)) {
+            log_message(LOG_INFO, "File is complete!");
+            return 0;
         }
 
         log_printf(LOG_DEBUG, "Closing socket %i", s);
