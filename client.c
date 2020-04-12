@@ -69,6 +69,7 @@ int client_init(const char *const metainfo) {
     }
 
     log_printf(LOG_DEBUG, "Finished");
+    free(filename);
     return 0;
 }
 
@@ -102,7 +103,7 @@ int client__start(struct fio_torrent_t *t) {
         } else {
             log_printf(LOG_INFO, "Connection failed for peer %s %u (%s) trying next peer.", ip_address, ntohs(t->peers[i].peer_port), strerror(errno));
         }
-        
+
         if (client__is_completed(t)) {
             log_message(LOG_INFO, "File is complete!");
             return 0;
