@@ -1,8 +1,7 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef UTILS_H_
+#define UTILS_H_
 #include "enum.h"
 #include "file_io.h"
-#include "server.h"
 #include <poll.h>
 
 /**
