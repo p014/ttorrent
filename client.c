@@ -35,58 +35,38 @@ char client__is_completed(struct fio_torrent_t *const t) {
     return 1;
 }
 
-// TODO Handle free when an error occurs
-int client_init(const char *const metainfo) {
-    struct fio_torrent_t t;
-
-    // get original filename
-    char *filename = utils_original_file_name(metainfo);
-
-    if (!filename) {
-        log_printf(LOG_DEBUG, "Invalid filename (%s), file name format is file.ttorrent", metainfo);
-        return -1;
+int client_init(struct fio_torrent_t *t) {
+    if (t->downloaded_file_size == 0) {
+        log_message(LOG_INFO, "Nothing to download! File size is 0");
+        return 0;
     }
 
-    log_printf(LOG_DEBUG, "metainfo: %s, filename: %s", metainfo, filename);
-
-    if (fio_create_torrent_from_metainfo_file(metainfo, &t, filename)) {
-        log_printf(LOG_INFO, "Failed to load metainfo: %s", strerror(errno));
-        errno = 0;
-        return -1;
-    }
-
-    if (client__is_completed(&t)) {
+    if (client__is_completed(t)) {
         log_message(LOG_INFO, "File is complete!");
         return 0;
     }
 
-    if (client__start(&t)) {
+    if (client__start(t)) {
         log_printf(LOG_DEBUG, "Client failed");
         return -1;
     }
 
-    if (fio_destroy_torrent(&t)) {
-        log_printf(LOG_DEBUG, "Error while destroying the torrent struct: ", strerror(errno));
-        errno = 0;
-        return -1;
-    }
-
     log_printf(LOG_DEBUG, "Finished");
-    free(filename);
     return 0;
 }
 
 int client__start(struct fio_torrent_t *t) {
     for (uint64_t i = 0; i < t->peer_count; i++) {
+
         int s = socket(AF_INET, SOCK_STREAM, 0);
-        struct sockaddr_in srv_addr;
-        char ip_address[20];
+
         if (s < 0) {
             log_printf(LOG_DEBUG, "Failed to create a socket %s", strerror(errno));
             errno = 0;
             return -1;
         }
 
+        char ip_address[20];
         sprintf(ip_address, "%d.%d.%d.%d",
                 t->peers[i].peer_address[0], t->peers[i].peer_address[1],
                 t->peers[i].peer_address[2], t->peers[i].peer_address[3]);
@@ -94,17 +74,18 @@ int client__start(struct fio_torrent_t *t) {
         log_printf(LOG_DEBUG, "Connecting to %s %u", ip_address,
                    ntohs(t->peers[i].peer_port));
 
+        struct sockaddr_in srv_addr;
         memset(&srv_addr, 0, sizeof(struct sockaddr_in));
         srv_addr.sin_family = AF_INET;
-        // since we already have the ip address in quad-dotted format.
         srv_addr.sin_addr.s_addr = inet_addr(ip_address);
         srv_addr.sin_port = t->peers[i].peer_port;
 
         if (connect(s, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
-            log_printf(LOG_INFO, "Connection failed for peer %s %u (%s)", ip_address,
+            log_printf(LOG_INFO, "Connection failed for peer %s %u: %s", ip_address,
                        ntohs(t->peers[i].peer_port), strerror(errno));
             log_printf(LOG_INFO, "Trying try next peer");
             errno = 0;
+            continue;
         }
 
         log_printf(LOG_DEBUG, "Connected! Socket %i", s);

@@ -7,7 +7,7 @@
  * @param metainfo name of the torrent file, must have the extension .ttorrent and must be in the same directory
  * @return 0 for succes or -1 for errors
  */
-int client_init(const char *const metainfor);
+int client_init(struct fio_torrent_t *t);
 
 /** 
  * Handle connections to the peers
