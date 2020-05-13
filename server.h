@@ -45,6 +45,6 @@ void server__remove_client(struct utils_array_rcv_data_t *d, struct utils_array_
  * @return 0 if everything went correctly or -1 if error
  * @param metainfo name of the torrent file, must have the extension .ttorrent and must be in the same directory
  */
-int server_init(const uint16_t port, const char *const metainfo);
+int server_init(uint16_t const port, struct fio_torrent_t *torrent);
 
 #endif

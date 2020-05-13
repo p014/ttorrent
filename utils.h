@@ -55,6 +55,9 @@ struct utils_array_pollfd_t {
  */
 char *utils_original_file_name(const char *const metainfo);
 
+int utils_create_torrent_struct(char *metainfo, struct fio_torrent_t *torrent);
+
+
 /**
  * Init utils_array_pollfd_t with an array of 4 elements.
  * @param this pointer to the structure

@@ -5,6 +5,8 @@
 #include "file_io.h"
 #include "logger.h"
 #include "server.h"
+#include "utils.h"
+#include <errno.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,17 +19,25 @@
 int main(int argc, char **argv) {
     set_log_level(LOG_DEBUG);
 
-    log_printf(LOG_INFO, "Trivial Torrent (build %s %s)\n", __DATE__, __TIME__);
+    log_printf(LOG_INFO, "Trivial Torrent (build %s %s)", __DATE__, __TIME__);
 
     switch (argc) {
     case 2: {
-        if (strstr(argv[1], ".ttorrent") == NULL) { // client
-            log_printf(LOG_INFO, "File must have the .ttorrent extension");
+        log_message(LOG_INFO, "Starting Client...");
+        struct fio_torrent_t t;
+
+        if (utils_create_torrent_struct(argv[1], &t)) {
+            log_printf(LOG_DEBUG, "Failed to create torrent struct from for filename: %s", argv[1]);
             break;
         }
 
-        if (client_init(argv[1])) {
+        if (client_init(&t)) {
             log_printf(LOG_INFO, "Somewthing went wrong with the client");
+        }
+
+        if (fio_destroy_torrent(&t)) {
+            log_printf(LOG_DEBUG, "Error while destroying the torrent struct: %s", strerror(errno));
+            break;
         }
 
         break;
@@ -40,6 +50,7 @@ int main(int argc, char **argv) {
 
         if (fio_create_metainfo(argv[2]) != 0) {
             log_printf(LOG_INFO, "Failed to create ttorrent file for %s", argv[2]);
+            break;
         }
 
         break;
@@ -54,13 +65,25 @@ int main(int argc, char **argv) {
 
         int32_t port = atoi(argv[2]);
 
-        if (!(port <= UINT16_MAX && port > 0)) {
-            log_printf(LOG_INFO, "Port must be a number between %i and %i", UINT16_MAX, 1);
+        if (!(port <= 65535 && port > 0)) { // 65535 should be UINT16_MAX
+            log_printf(LOG_INFO, "Port must be a number between %i and %i", 65535, 1);
             break;
         }
 
-        if (server_init((uint16_t)port, argv[3])) {
+        struct fio_torrent_t t;
+
+        if (utils_create_torrent_struct(argv[3], &t)) {
+            log_printf(LOG_DEBUG, "Failed to create torrent struct from for filename: %s", argv[3]);
+            break;
+        }
+
+        if (server_init((uint16_t)port, &t)) {
             log_printf(LOG_INFO, "Somewthing went wrong with the server");
+        }
+
+        if (fio_destroy_torrent(&t)) {
+            log_printf(LOG_DEBUG, "Error while destroying the torrent struct: %s", strerror(errno));
+            break;
         }
 
         break;

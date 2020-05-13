@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "file_io.h"
 #include "logger.h"
 #include "server.h"
 #include <assert.h>
@@ -7,29 +8,40 @@
 #include <stdlib.h>
 #include <string.h>
 
-char *utils_original_file_name(const char *const ttorrent) {
-    const char *const end = strstr(ttorrent, ".ttorrent");
+int utils_create_torrent_struct(char *metainfo, struct fio_torrent_t *torrent) {
+    assert(metainfo != NULL);
+    assert(torrent != NULL);
+
+    char *end = strstr(metainfo, ".ttorrent");
     if (end == NULL) {
         log_message(LOG_DEBUG, "Invalid file extension");
-        return NULL;
+        return -1;
     }
 
-    uint32_t count = (uint32_t)(labs(ttorrent - end));
-    // Check if count is 0 (when the torrent name is just the extension ex.: .ttorrent)
-    if (!count) {
-        log_printf(LOG_INFO, "Invalid filename, filename should be name.ttorrent");
-        return NULL;
+    uint32_t charcount = (uint32_t)(end - metainfo);
+    if (charcount > 0xffu) {
+        log_printf(LOG_INFO, "File name cannot have more than 255 characters: got %u", charcount);
+        return -1;
     }
 
-    char *const buffer = (char *)malloc(sizeof(char) * (count));
-    if (buffer == NULL) {
-        log_printf(LOG_DEBUG, "Failed to allocate buffer");
-        return NULL;
+    char *filename = malloc(sizeof(char) * (size_t)(charcount + 1));
+
+    if (!filename) {
+        log_printf(LOG_INFO, "Cannot allocate: %s", strerror(errno));
+        return -1;
     }
 
-    strncpy(buffer, ttorrent, count);
+    strncpy(filename, metainfo, charcount);
 
-    return buffer;
+    if (fio_create_torrent_from_metainfo_file(metainfo, torrent, filename)) {
+        log_printf(LOG_INFO, "Failed to load metainfo: %s", strerror(errno));
+        errno = 0;
+        free(filename);
+        return -1;
+    }
+
+    free(filename);
+    return 0;
 }
 
 int utils_array_rcv_init(struct utils_array_rcv_data_t *this) {
@@ -200,7 +212,7 @@ ssize_t utils_send_all(int socket, void *buffer, size_t length) {
     char *ptr = (char *)buffer;
     size_t total_lenth = 0;
     while (length > 0) {
-        ssize_t i = send(socket, ptr, length, 0);
+        ssize_t i = send(socket, ptr, length, MSG_NOSIGNAL);
         if (i < 1)
             return i;
         ptr += (uint64_t)i;
@@ -214,7 +226,7 @@ ssize_t utils_recv_all(int socket, void *buffer, size_t length) {
     char *ptr = (char *)buffer;
     size_t total_lenth = 0;
     while (length > 0) {
-        ssize_t i = recv(socket, ptr, length, 0);
+        ssize_t i = recv(socket, ptr, length, MSG_NOSIGNAL);
         if (i < 1)
             return i;
         ptr += (uint64_t)i;

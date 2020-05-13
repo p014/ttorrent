@@ -13,8 +13,8 @@
         // "-c", // create metainfo
         // "testfile.txt"
         "-l", //server
-        "1",
-        "file.ttorrent"
+        "8087",
+        "random.fil.ttorrent"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/bin/",
