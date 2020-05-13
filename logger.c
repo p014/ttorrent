@@ -23,7 +23,7 @@ void log_message(const enum log_level_e log_level, const char *const message) {
         return;
     }
 
-    (void)fprintf(stderr, "[%lu]: %s\n", LOG_COUNT, message);
+    (void)fprintf(stderr, "%lu: %s\n", LOG_COUNT, message);
     LOG_COUNT++;
 }
 
@@ -38,7 +38,7 @@ void log_printf(const enum log_level_e log_level, const char *const format, ...)
     va_list ap;
 
     va_start(ap, format);
-    fprintf(stderr, "[%lu]: ", LOG_COUNT);
+    fprintf(stderr, "%lu: ", LOG_COUNT);
     (void)vfprintf(stderr, format, ap);
     va_end(ap);
 
