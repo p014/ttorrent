@@ -1,3 +1,8 @@
+#include "client.h"
+#include "enum.h"
+#include "file_io.h"
+#include "logger.h"
+#include "utils.h"
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
@@ -6,12 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/unistd.h>
-
-#include "client.h"
-#include "enum.h"
-#include "file_io.h"
-#include "logger.h"
-#include "utils.h"
 
 /*
 1. Load a metainfo file (functionality is already available in the file_io API).
@@ -118,7 +117,7 @@ int client__start(struct fio_torrent_t *t) {
 
         log_printf(LOG_DEBUG, "Closing socket %i", s);
         if (close(s)) {
-            log_printf("Failed to close socket %i: %s", s, strerror(errno));
+            log_printf(LOG_DEBUG, "Failed to close socket %i: %s", s, strerror(errno));
             errno = 0;
         }
 
