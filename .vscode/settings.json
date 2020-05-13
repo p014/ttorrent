@@ -108,5 +108,9 @@
     "typeinfo": "c",
     "valarray": "c"
   },
-  "discord.enabled": false
+  "C_Cpp.default.defines": [
+    "__linux__",
+    "__x86_64__",
+    "_GNU_SOURCE"
+  ],
 }
