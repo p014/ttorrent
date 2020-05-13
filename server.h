@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 #include "file_io.h"
+#include "utils.h"
 #include <stdint.h>
 
 /**
@@ -31,7 +32,12 @@ int server__blocking(const int sockd);
  * @param sockd A descriptor to a blocking socket 
  * @return Doesn't return.
  */
-void server__die(char *file_name, int ile_line, struct utils_array_pollfd_t *d, struct utils_array_pollfd_t *p);
+void server__die(char *file_name, int file_line, struct utils_array_rcv_data_t *ptrData, struct utils_array_pollfd_t *ptrPoll);
+
+// Wrapper for server__die
+#define SEVER_DIE(ptrData, ptrPoll) server__die(__FILE__, __LINE__, (ptrData), (ptrPoll));
+
+void server__remove_client(struct utils_array_rcv_data_t *d, struct utils_array_pollfd_t *p, int sock);
 
 /**
  * Main function
