@@ -2,11 +2,10 @@
  * This file implements the Logging API specified in logger.h.
  */
 
+#include "logger.h"
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
-
-#include "logger.h"
 
 static enum log_level_e current_log_level = LOG_INFO; ///< Global variable defining the current log level.
 static unsigned long LOG_COUNT = 1;                   ///< Global variable to keep count of the logs
