@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/fcntl.h>
 #include <sys/poll.h>
@@ -15,6 +16,10 @@
 #include "utils.h"
 
 #define TIME_TO_POLL -1 //  wait forever
+
+// Wrapper for server__die
+#define SEVER_DIE(polling_array_ptr, msg_array_ptr) \
+    server__die(__FILE__, __LINE__, (polling_array_ptr), (msg_array_ptr));
 
 /*
 1. Load a metainfo file (functionality is already available in the file_io API).
@@ -58,7 +63,7 @@ int server_init(uint16_t const port, const char *const metainfo) {
     }
 
     if (fio_destroy_torrent(&torrent)) {
-        log_printf(LOG_DEBUG, "Error while destroying the torrent struct: ", strerror(errno));
+        log_printf(LOG_DEBUG, "Error while destroying the torrent struct: %s", strerror(errno));
         return -1;
     }
 
@@ -102,6 +107,36 @@ int server__init_socket(const uint16_t port) {
     return s;
 }
 
+void server__die(char *file_name, int file_line, struct utils_array_pollfd_t *d, struct utils_array_pollfd_t *p) {
+
+    log_printf(LOG_DEBUG, "Program exitted at %s:%d", file_name, file_line);
+
+    if (p != NULL)
+        utils_array_pollfd_destroy(p);
+    if (d != NULL)
+        utils_array_rcv_destroy(d);
+
+    exit(EXIT_FAILURE);
+}
+
+void server__remove_client(struct utils_array_pollfd_t *d, struct utils_array_pollfd_t *p, int sock) {
+
+    if (utils_array_rcv_remove(&d, sock)) {
+        log_printf(LOG_DEBUG, "Could not remove dead socket from msg array");
+        SEVER_DIE(&d, &p);
+    }
+
+    if (utils_array_pollfd_remove(&p, sock)) {
+        log_printf(LOG_DEBUG, "Could not remove dead socket from polling array");
+        SEVER_DIE(&d, &p);
+    }
+
+    if (close(sock)) {
+        log_printf(LOG_INFO, "Could not close socket %i", t->fd, strerror(errno));
+        SEVER_DIE(&d, &p);
+    }
+}
+
 int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
     struct utils_array_pollfd_t p;   // array to poll
     struct utils_array_rcv_data_t d; // array to store the rcv messages
@@ -136,69 +171,102 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                     }
 
                     log_printf(LOG_INFO, "Got a connection from %s in socket %i", inet_ntoa(client.sin_addr), rcv);
-                    utils_array_pollfd_add(&p, rcv, POLLIN);
+
+                    if (utils_array_pollfd_add(&p, rcv, POLLIN)) {
+                        log_printf(LOG_INFO, "Could save not message from socket %i to the array", t->fd);
+                    }
 
                 } else { // read data
                     struct utils_message_t buffer;
                     ssize_t read = utils_recv_all(t->fd, &buffer, RAW_MESSAGE_SIZE);
 
+                    if (read < 0) {
+                        log_printf(LOG_DEBUG, "Error while reading: %s", strerror(errno));
+                        errno = 0;
+                        continue;
+                    }
+
                     if (read > 0) {
                         log_printf(LOG_INFO, "Got %i bytes from socket %i", read, t->fd);
-                        // store the data to use later
-                        utils_array_rcv_add(&d, t->fd, &buffer);
+
+                        // mark to handle message
                         t->events = POLLOUT;
-                    } else if (read == 0) {
-                        // remove from polling
+
+                        // store the data to use later
+
+                        if (utils_array_rcv_add(&d, t->fd, &buffer)) {
+                            log_printf(LOG_INFO, "Could save not message from socket %i to the array", t->fd);
+                        }
+
+                    } else if (read == 0) { // connection closed
+
                         log_printf(LOG_INFO, "Connection closed on socket %i", t->fd);
-                        close(t->fd);
-                        int temp_sock = t->fd;
-                        utils_array_rcv_remove(&d, temp_sock);
-                        utils_array_pollfd_remove(&p, temp_sock);
-                    } else {
-                        log_printf(LOG_DEBUG, "Error while reading: %s", strerror(errno));
+
+                        // remove dead client
+                        server__remove_client(&d, &p, t->fd);
                     }
                 }
 
             } else if (t->revents & POLLOUT) { // if we can send without blocking
-                t->events = POLLIN;
-                struct utils_message_payload_t payload;
-                struct utils_message_t *te = utils_array_rcv_find(&d, t->fd); // find message recieved
 
-                if (te == NULL) {
+                struct utils_message_payload_t payload;
+                struct utils_message_t *msg_rcv = utils_array_rcv_find(&d, t->fd); // find message recieved
+
+                if (msg_rcv == NULL) {
                     log_printf(LOG_DEBUG, "No messages recieved from %i, socket marked for POLLIN", t->fd);
+                    log_printf(LOG_DEBUG, "This shouldn't have happened");
                     continue;
                 }
 
-                if (te->magic_number == MAGIC_NUMBER) { // check recieved message
-                    if (te->message_code == MSG_REQUEST && te->block_number < torrent->block_count) {
-                        if (torrent->block_map[te->block_number]) { // check block hash
-                            struct fio_block_t block;
+                if (msg_rcv->magic_number != MAGIC_NUMBER) { // check recieved message
+                    log_printf(LOG_INFO, "Magic number is wrong!");
+                    server__remove_client(&d, &p, t->fd);
+                    continue;
+                }
 
-                            // contruct the payload and send it
-                            log_printf(LOG_INFO, "Sending payload for block %i from socked %i", payload.block_number, t->fd);
-                            payload.magic_number = MAGIC_NUMBER;
-                            payload.message_code = MSG_RESPONSE_OK;
-                            payload.block_number = te->block_number;
+                if (msg_rcv->message_code != MSG_REQUEST) {
+                    log_printf(LOG_INFO, "Message code is wrong!");
+                    server__remove_client(&d, &p, t->fd);
+                    continue;
+                }
 
-                            fio_load_block(torrent, payload.block_number, &block);
-                            memcpy(payload.data, block.data, block.size);
+                if (msg_rcv->block_number >= torrent->block_count) {
+                    log_printf(LOG_INFO, "Block number is outside of bounds!");
+                    server__remove_client(&d, &p, t->fd);
+                    continue;
+                }
 
-                            if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE + block.size) > 0) {
-                                log_printf(LOG_INFO, "Send sucess");
-                            } else {
-                                log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
-                            }
+                if (!torrent->block_map[msg_rcv->block_number]) { // check if we have the block
+                    log_message(LOG_INFO, "Block hash incorrect hash, sending MSG_RESPONSE_NA");
+                    payload.message_code = MSG_RESPONSE_NA;
 
-                        } else {
-                            log_message(LOG_INFO, "Block hash incorrect hash, sending MSG_RESPONSE_NA");
-                            payload.message_code = MSG_RESPONSE_NA;
+                    if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE) > 0) {
+                        log_printf(LOG_INFO, "Send sucess");
+                        // mark for recieving
+                        t->events = POLLIN;
+                    } else {
+                        log_printf(LOG_INFO, "Could not send MSG_RESPONSE_NA: %s", strerror(errno));
+                        errno = 0;
+                    }
 
-                            if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE) > 0) {
-                                log_printf(LOG_INFO, "Send sucess");
-                            } else {
-                                log_printf(LOG_INFO, "Could not send MSG_RESPONSE_NA: %s", strerror(errno));
-                            }
-                        }
+                } else {
+                    // contruct the payload and send it
+                    struct fio_block_t block;
+                    log_printf(LOG_INFO, "Sending payload for block %i from socked %i", payload.block_number, t->fd);
+                    payload.magic_number = MAGIC_NUMBER;
+                    payload.message_code = MSG_RESPONSE_OK;
+                    payload.block_number = msg_rcv->block_number;
+
+                    fio_load_block(torrent, payload.block_number, &block);
+                    memcpy(payload.data, block.data, block.size);
+
+                    if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE + block.size) > 0) {
+                        log_printf(LOG_INFO, "Send sucess");
+                        // mark for recieving
+                        t->events = POLLIN;
+                    } else {
+                        log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
+                        errno = 0;
                     }
                 }
 
@@ -210,5 +278,6 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
 
     utils_array_pollfd_destroy(&p);
     utils_array_rcv_destroy(&d);
+
     return 0;
 }

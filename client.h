@@ -15,7 +15,7 @@ int client_init(const char *const metainfor);
  * @param s descriptor to the connection
  * @param 
  */
-void client__handle_connection(struct fio_torrent_t *t, const int s);
+int client__handle_connection(struct fio_torrent_t *t, const int s);
 
 /**
  * Check if torrent is completed 

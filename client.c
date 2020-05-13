@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/unistd.h>
 
@@ -42,7 +43,7 @@ int client_init(const char *const metainfo) {
     char *filename = utils_original_file_name(metainfo);
 
     if (!filename) {
-        log_printf(LOG_DEBUG, "Error filename is %s", metainfo);
+        log_printf(LOG_DEBUG, "Invalid filename (%s), file name format is file.ttorrent", metainfo);
         return -1;
     }
 
@@ -50,6 +51,7 @@ int client_init(const char *const metainfo) {
 
     if (fio_create_torrent_from_metainfo_file(metainfo, &t, filename)) {
         log_printf(LOG_INFO, "Failed to load metainfo: %s", strerror(errno));
+        errno = 0;
         return -1;
     }
 
@@ -65,6 +67,7 @@ int client_init(const char *const metainfo) {
 
     if (fio_destroy_torrent(&t)) {
         log_printf(LOG_DEBUG, "Error while destroying the torrent struct: ", strerror(errno));
+        errno = 0;
         return -1;
     }
 
@@ -78,100 +81,133 @@ int client__start(struct fio_torrent_t *t) {
         int s = socket(AF_INET, SOCK_STREAM, 0);
         struct sockaddr_in srv_addr;
         char ip_address[20];
-        uint32_t ip;
         if (s < 0) {
             log_printf(LOG_DEBUG, "Failed to create a socket %s", strerror(errno));
+            errno = 0;
             return -1;
         }
 
-        sprintf(ip_address, "%d.%d.%d.%d", t->peers[i].peer_address[0], t->peers[i].peer_address[1], t->peers[i].peer_address[2], t->peers[i].peer_address[3]);
-        log_printf(LOG_DEBUG, "Connecting to %s %u", ip_address, ntohs(t->peers[i].peer_port));
-        memset(&srv_addr, 0, sizeof srv_addr);
+        sprintf(ip_address, "%d.%d.%d.%d",
+                t->peers[i].peer_address[0], t->peers[i].peer_address[1],
+                t->peers[i].peer_address[2], t->peers[i].peer_address[3]);
+
+        log_printf(LOG_DEBUG, "Connecting to %s %u", ip_address,
+                   ntohs(t->peers[i].peer_port));
+
+        memset(&srv_addr, 0, sizeof(struct sockaddr_in));
         srv_addr.sin_family = AF_INET;
-        // srv_addr.sin_addr.s_addr = inet_addr(ip_address);
-        struct fio_peer_information_t *ipp = &t->peers[i];
-        ip = (uint32_t)ipp->peer_address[0] << 24 |
-             (uint32_t)ipp->peer_address[1] << 16 |
-             (uint32_t)ipp->peer_address[2] << 8 |
-             (uint32_t)ipp->peer_address[3] << 0;
-        srv_addr.sin_addr.s_addr = htonl(ip);
+        // since we already have the ip address in quad-dotted format.
+        srv_addr.sin_addr.s_addr = inet_addr(ip_address);
         srv_addr.sin_port = t->peers[i].peer_port;
 
-        if (!connect(s, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
-            log_printf(LOG_DEBUG, "Connected! Socket %i", s);
-            client__handle_connection(t, s);
-        } else {
-            log_printf(LOG_INFO, "Connection failed for peer %s %u (%s) trying next peer.", ip_address, ntohs(t->peers[i].peer_port), strerror(errno));
+        if (connect(s, (struct sockaddr *)&srv_addr, sizeof(srv_addr))) {
+            log_printf(LOG_INFO, "Connection failed for peer %s %u (%s)", ip_address,
+                       ntohs(t->peers[i].peer_port), strerror(errno));
+            log_printf(LOG_INFO, "Trying try next peer");
+            errno = 0;
+        }
+
+        log_printf(LOG_DEBUG, "Connected! Socket %i", s);
+
+        if (client__handle_connection(t, s)) {
+            log_printf(LOG_INFO, "Something went wrong with peer: %s %u", ip_address,
+                       ntohs(t->peers[i].peer_port));
+
+            log_printf(LOG_INFO, "Trying next peer");
+        }
+
+        log_printf(LOG_DEBUG, "Closing socket %i", s);
+        if (close(s)) {
+            log_printf("Failed to close socket %i: %s", s, strerror(errno));
+            errno = 0;
         }
 
         if (client__is_completed(t)) {
             log_message(LOG_INFO, "File is complete!");
             return 0;
         }
-
-        log_printf(LOG_DEBUG, "Closing socket %i", s);
-        close(s);
     }
 
     return 0;
 }
 
-void client__handle_connection(struct fio_torrent_t *t, const int s) {
-    for (uint64_t k = 0; k < t->block_count; k++) {
-        if (!t->block_map[k]) { // if hash is incorrect
-            struct utils_message_t message;
-            struct utils_message_t *response_msg;
-            char buffer[RAW_MESSAGE_SIZE];
-            ssize_t recv_count;
+int client__handle_connection(struct fio_torrent_t *t, const int s) {
 
+    for (uint64_t k = 0; k < t->block_count; k++) {
+
+        if (!t->block_map[k]) { // if hash is incorrect, we download the block
+
+            struct utils_message_t message;
             message.magic_number = MAGIC_NUMBER;
             message.message_code = MSG_REQUEST;
             message.block_number = k;
 
-            log_printf(LOG_INFO, "requesting magic_number = %x, message_code = %u, block_number = %lu", message.magic_number, message.message_code, message.block_number);
+            log_printf(LOG_INFO, "requesting magic_number = %x, message_code = %u, block_number = %lu",
+                       message.magic_number, message.message_code, message.block_number);
 
             if (utils_send_all(s, &message, RAW_MESSAGE_SIZE) < 0) {
                 log_printf(LOG_DEBUG, "Could not send %s", strerror(errno));
-                break; // try next peer
+                errno = 0;
+                return -1; // try next peer
             }
 
             // recieve block
+            ssize_t recv_count;
+            char buffer[RAW_MESSAGE_SIZE];
             recv_count = utils_recv_all(s, &buffer, RAW_MESSAGE_SIZE);
+
             if (recv_count == 0) {
                 log_printf(LOG_DEBUG, "Connection closed");
-                break; // next peer
+                return -1; // try next peer
             } else if (recv_count == -1) {
                 log_printf(LOG_DEBUG, "Could not recieve %s", strerror(errno));
-                break; // next peer
+                errno = 0;
+                return -1; // try next peer
             }
 
-            response_msg = (struct utils_message_t *)buffer;
-            log_printf(LOG_INFO, "Recieved magic_number = %x, message_code = %u, block_number = %lu ", response_msg->magic_number, response_msg->message_code, response_msg->block_number);
+            struct utils_message_t *response_msg = (struct utils_message_t *)buffer;
+            log_printf(LOG_INFO, "Recieved magic_number = %x, message_code = %u, block_number = %lu ",
+                       response_msg->magic_number, response_msg->message_code, response_msg->block_number);
 
-            if (response_msg->magic_number == MAGIC_NUMBER) {
-                if (response_msg->message_code == MSG_RESPONSE_OK && response_msg->block_number == k) {
-                    struct fio_block_t block;
-                    log_printf(LOG_INFO, "Response is correct!");
-                    block.size = fio_get_block_size(t, k);
-                    recv_count = utils_recv_all(s, &block.data, block.size);
-
-                    if (recv_count == 0) {
-                        log_printf(LOG_DEBUG, "Connection closed");
-                        break; // next peer
-                    } else if (recv_count == -1) {
-                        log_printf(LOG_DEBUG, "Could not recieve %s", strerror(errno));
-                        break; // next peer
-                    }
-
-                    if (fio_store_block(t, k, &block)) {
-                        log_printf(LOG_DEBUG, "Failed to store block %i: %s", k, strerror(errno));
-                    } else {
-                        log_printf(LOG_DEBUG, "Store block %i", k);
-                    }
-                }
+            if (response_msg->magic_number != MAGIC_NUMBER) {
+                log_printf(LOG_INFO, "Magic number is wrong!");
+                return -1; // try next peer
             }
+
+            if (response_msg->message_code != MSG_RESPONSE_OK) {
+                log_printf(LOG_INFO, "Response code is wrong!");
+                return -1; // try next peer
+            }
+
+            if (response_msg->block_number != k) {
+                log_printf(LOG_INFO, "Block number is wrong!");
+                return -1; // try next peer
+            }
+
+            struct fio_block_t block;
+            log_printf(LOG_INFO, "Response is correct!");
+            block.size = fio_get_block_size(t, k);
+            recv_count = utils_recv_all(s, &block.data, block.size);
+
+            if (recv_count == 0) {
+                log_printf(LOG_DEBUG, "Connection closed");
+                return -1; // try next peer
+            } else if (recv_count == -1) {
+                log_printf(LOG_DEBUG, "Could not recieve %s", strerror(errno));
+                errno = 0;
+                return -1; // try next peer
+            }
+
+            if (fio_store_block(t, k, &block)) {
+                log_printf(LOG_DEBUG, "Failed to store block %i: %s", k, strerror(errno));
+                errno = 0;
+            }
+
+            log_printf(LOG_DEBUG, "Block %i stored saved", k);
 
         } // block hash
 
     } // for
+
+    return 0;
 }

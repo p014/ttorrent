@@ -26,6 +26,14 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const t);
 int server__blocking(const int sockd);
 
 /**
+ * Your kill switch
+ * The struct pointers maybe NULL.
+ * @param sockd A descriptor to a blocking socket 
+ * @return Doesn't return.
+ */
+void server__die(char *file_name, int ile_line, struct utils_array_pollfd_t *d, struct utils_array_pollfd_t *p);
+
+/**
  * Main function
  * @param port the port to listen to 
  * @return 0 if everything went correctly or -1 if error

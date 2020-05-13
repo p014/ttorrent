@@ -432,7 +432,6 @@ int fio_store_block(struct fio_torrent_t *const torrent, const uint64_t block_nu
         errno = EINVAL;
         return r1;
     }
-#if !__TEST_MODE__ // Disable writting to disk for test mode
     const uint64_t offset64 = block_number * FIO_MAX_BLOCK_SIZE;
 
     const off_t offset = (off_t)offset64;
@@ -453,9 +452,7 @@ int fio_store_block(struct fio_torrent_t *const torrent, const uint64_t block_nu
     if (r3 < block->size) {
         return -1;
     }
-#else
-    log_printf(LOG_DEBUG, "TEST MODE ENABLED, DISABLED WRITTING TO DISK!");
-#endif
+
     torrent->block_map[block_number] = 1;
 
     return 0;

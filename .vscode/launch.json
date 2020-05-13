@@ -5,7 +5,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "preLaunchTask": "Make",
       "name": "(gdb) Launch",
       "type": "cppdbg",
       "request": "launch",
@@ -13,10 +12,9 @@
       "args": [
         // "-c", // create metainfo
         // "testfile.txt"
-        "-l",//server
+        "-l", //server
         "8080",
-        "t.exe.ttorrent"
-
+        "server.ttorrent"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}/bin/",
@@ -30,6 +28,16 @@
           "ignoreFailures": true
         }
       ]
+    },
+    {
+      "preLaunchTask": "Make",
+      "name": "Debug",
+      "type": "gdb",
+      "request": "launch",
+      "target": "${workspaceFolder}/bin/ttorrent",
+      "arguments": "-l 8080 ttorrent.ttorrent",
+      "cwd": "${workspaceRoot}",
+      "valuesFormatting": "parseText"
     }
   ]
 }
