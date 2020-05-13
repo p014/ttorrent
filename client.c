@@ -67,9 +67,12 @@ int client__start(struct fio_torrent_t *t) {
         }
 
         char ip_address[20];
-        sprintf(ip_address, "%d.%d.%d.%d",
-                t->peers[i].peer_address[0], t->peers[i].peer_address[1],
-                t->peers[i].peer_address[2], t->peers[i].peer_address[3]);
+        if (!sprintf(ip_address, "%d.%d.%d.%d",
+                     t->peers[i].peer_address[0], t->peers[i].peer_address[1],
+                     t->peers[i].peer_address[2], t->peers[i].peer_address[3])) {
+            log_printf(LOG_DEBUG, "Library call failed (sprintf) at %s:%d", __FILE__, __LINE__);
+            return -1;
+        }
 
         log_printf(LOG_DEBUG, "Connecting to %s %u", ip_address,
                    ntohs(t->peers[i].peer_port));
@@ -85,6 +88,7 @@ int client__start(struct fio_torrent_t *t) {
                        ntohs(t->peers[i].peer_port), strerror(errno));
             log_printf(LOG_INFO, "Trying try next peer");
             errno = 0;
+            close(s);
             continue;
         }
 
@@ -95,12 +99,15 @@ int client__start(struct fio_torrent_t *t) {
                        ntohs(t->peers[i].peer_port));
 
             log_printf(LOG_INFO, "Trying next peer");
+            close(s);
+            continue;
         }
 
         log_printf(LOG_DEBUG, "Closing socket %i", s);
         if (close(s)) {
             log_printf(LOG_DEBUG, "Failed to close socket %i: %s", s, strerror(errno));
             errno = 0;
+            return -1;
         }
 
         if (client__is_completed(t)) {
