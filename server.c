@@ -1,3 +1,8 @@
+#include "server.h"
+#include "enum.h"
+#include "file_io.h"
+#include "logger.h"
+#include "utils.h"
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
@@ -9,17 +14,7 @@
 #include <sys/poll.h>
 #include <sys/unistd.h>
 
-#include "enum.h"
-#include "file_io.h"
-#include "logger.h"
-#include "server.h"
-#include "utils.h"
-
 #define TIME_TO_POLL -1 //  wait forever
-
-// Wrapper for server__die
-#define SEVER_DIE(polling_array_ptr, msg_array_ptr) \
-    server__die(__FILE__, __LINE__, (polling_array_ptr), (msg_array_ptr));
 
 /*
 1. Load a metainfo file (functionality is already available in the file_io API).
@@ -107,33 +102,33 @@ int server__init_socket(const uint16_t port) {
     return s;
 }
 
-void server__die(char *file_name, int file_line, struct utils_array_pollfd_t *d, struct utils_array_pollfd_t *p) {
+void server__die(char *file_name, int file_line, struct utils_array_rcv_data_t *ptrData, struct utils_array_pollfd_t *ptrPoll) {
 
     log_printf(LOG_DEBUG, "Program exitted at %s:%d", file_name, file_line);
 
-    if (p != NULL)
-        utils_array_pollfd_destroy(p);
-    if (d != NULL)
-        utils_array_rcv_destroy(d);
+    if (ptrPoll != NULL)
+        utils_array_pollfd_destroy(ptrPoll);
+    if (ptrData != NULL)
+        utils_array_rcv_destroy(ptrData);
 
     exit(EXIT_FAILURE);
 }
 
-void server__remove_client(struct utils_array_pollfd_t *d, struct utils_array_pollfd_t *p, int sock) {
+void server__remove_client(struct utils_array_rcv_data_t *ptrData, struct utils_array_pollfd_t *ptrPoll, int sock) {
 
-    if (utils_array_rcv_remove(&d, sock)) {
+    if (utils_array_rcv_remove(ptrData, sock)) {
         log_printf(LOG_DEBUG, "Could not remove dead socket from msg array");
-        SEVER_DIE(&d, &p);
+        SEVER_DIE(ptrData, ptrPoll);
     }
 
-    if (utils_array_pollfd_remove(&p, sock)) {
+    if (utils_array_pollfd_remove(ptrPoll, sock)) {
         log_printf(LOG_DEBUG, "Could not remove dead socket from polling array");
-        SEVER_DIE(&d, &p);
+        SEVER_DIE(ptrData, ptrPoll);
     }
 
     if (close(sock)) {
-        log_printf(LOG_INFO, "Could not close socket %i", t->fd, strerror(errno));
-        SEVER_DIE(&d, &p);
+        log_printf(LOG_INFO, "Could not close socket %i", sock, strerror(errno));
+        SEVER_DIE(ptrData, ptrPoll);
     }
 }
 
