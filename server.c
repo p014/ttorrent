@@ -27,6 +27,7 @@
   c. Otherwise, respond with a message signaling the unavailability of the block.
 */
 
+// TODO Handle free when an error occurs
 int server_init(uint16_t const port, const char *const metainfo) {
     struct fio_torrent_t torrent;
     // get original filename
@@ -48,20 +49,19 @@ int server_init(uint16_t const port, const char *const metainfo) {
     int s = server__init_socket(port);
 
     if (s < 0) {
-        log_printf(LOG_DEBUG, "Failed to init socket with port %s", port);
+        log_printf(LOG_DEBUG, "Failed to init socket with port %i", port);
         return -1;
     }
 
     if (server__non_blocking(s, &torrent)) {
         log_message(LOG_DEBUG, "Error while calling server__non_blocking");
-        return -1;
     }
 
     if (fio_destroy_torrent(&torrent)) {
         log_printf(LOG_DEBUG, "Error while destroying the torrent struct: %s", strerror(errno));
         return -1;
     }
-
+    free(filename);
     return 0;
 }
 

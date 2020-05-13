@@ -106,7 +106,8 @@
     "thread": "c",
     "typeindex": "c",
     "typeinfo": "c",
-    "valarray": "c"
+    "valarray": "c",
+    "sockets_harness.h": "c"
   },
   "C_Cpp.default.defines": [
     "__linux__",

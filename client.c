@@ -35,6 +35,7 @@ char client__is_completed(struct fio_torrent_t *const t) {
     return 1;
 }
 
+// TODO Handle free when an error occurs
 int client_init(const char *const metainfo) {
     struct fio_torrent_t t;
 
