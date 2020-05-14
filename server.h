@@ -34,6 +34,9 @@ int server__blocking(const int sockd);
  */
 void server__die(char *file_name, int file_line, struct utils_array_rcv_data_t *ptrData, struct utils_array_pollfd_t *ptrPoll);
 
+// Wrapper for server__die
+#define SEVER_DIE(ptrData, ptrPoll) server__die(__FILE__, __LINE__, (ptrData), (ptrPoll));
+
 /**
  * Removes a client from the the two arrays and closes the socket
  * @param d Recieved messages array
