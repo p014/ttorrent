@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     switch (argc) {
     case 2: {
         log_message(LOG_INFO, "Starting Client...");
-        struct fio_torrent_t t;
+        struct fio_torrent_t t = {0};
 
         if (utils_create_torrent_struct(argv[1], &t)) {
             log_printf(LOG_DEBUG, "Failed to create torrent struct from for filename: %s", argv[1]);
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
             break;
         }
 
-        struct fio_torrent_t t;
+        struct fio_torrent_t t = {0};
 
         if (utils_create_torrent_struct(argv[3], &t)) {
             log_printf(LOG_DEBUG, "Failed to create torrent struct from for filename: %s", argv[3]);

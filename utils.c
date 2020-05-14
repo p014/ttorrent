@@ -19,28 +19,21 @@ int utils_create_torrent_struct(char *metainfo, struct fio_torrent_t *torrent) {
     }
 
     uint32_t charcount = (uint32_t)(end - metainfo);
-    if (charcount > 0xffu) {
+    if (charcount > 255) {
         log_printf(LOG_INFO, "File name cannot have more than 255 characters: got %u", charcount);
         return -1;
     }
 
-    char *filename = malloc(sizeof(char) * (size_t)(charcount + 1));
-
-    if (!filename) {
-        log_printf(LOG_INFO, "Cannot allocate: %s", strerror(errno));
-        return -1;
-    }
+    char filename[255] = "";
 
     strncpy(filename, metainfo, charcount);
 
     if (fio_create_torrent_from_metainfo_file(metainfo, torrent, filename)) {
         log_printf(LOG_INFO, "Failed to load metainfo: %s", strerror(errno));
         errno = 0;
-        free(filename);
         return -1;
     }
 
-    free(filename);
     return 0;
 }
 
