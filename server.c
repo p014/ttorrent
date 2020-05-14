@@ -209,20 +209,13 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                     continue;
                 }
 
-                if (msg_rcv->magic_number != MAGIC_NUMBER) { // check recieved message
-                    log_printf(LOG_INFO, "Magic number is wrong!");
-                    server__remove_client(&d, &p, t->fd);
-                    continue;
-                }
+                log_printf(LOG_INFO, "Recieved magic_number = %x, message_code = %u, block_number = %lu ",
+                           msg_rcv->magic_number, msg_rcv->message_code, msg_rcv->block_number);
 
-                if (msg_rcv->message_code != MSG_REQUEST) {
-                    log_printf(LOG_INFO, "Message code is wrong!");
-                    server__remove_client(&d, &p, t->fd);
-                    continue;
-                }
-
-                if (msg_rcv->block_number >= torrent->block_count) {
-                    log_printf(LOG_INFO, "Block number is outside of bounds!");
+                if (msg_rcv->magic_number != MAGIC_NUMBER ||
+                    msg_rcv->message_code != MSG_REQUEST ||
+                    msg_rcv->block_number >= torrent->block_count) {
+                    log_printf(LOG_INFO, "Magic number, messagecode or block number wrong, dropping client!");
                     server__remove_client(&d, &p, t->fd);
                     continue;
                 }

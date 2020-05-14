@@ -157,18 +157,10 @@ int client__handle_connection(struct fio_torrent_t *t, const int s) {
             log_printf(LOG_INFO, "Recieved magic_number = %x, message_code = %u, block_number = %lu ",
                        response_msg->magic_number, response_msg->message_code, response_msg->block_number);
 
-            if (response_msg->magic_number != MAGIC_NUMBER) {
-                log_printf(LOG_INFO, "Magic number is wrong!");
-                return -1; // try next peer
-            }
-
-            if (response_msg->message_code != MSG_RESPONSE_OK) {
-                log_printf(LOG_INFO, "Response code is wrong!");
-                return -1; // try next peer
-            }
-
-            if (response_msg->block_number != k) {
-                log_printf(LOG_INFO, "Block number is wrong!");
+            if (response_msg->magic_number != MAGIC_NUMBER ||
+                response_msg->message_code != MSG_RESPONSE_OK ||
+                response_msg->block_number != k) {
+                log_printf(LOG_INFO, "Magic number, messagecode or block number wrong, dropping client!");
                 return -1; // try next peer
             }
 
