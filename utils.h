@@ -49,12 +49,12 @@ struct utils_array_pollfd_t {
 };
 
 /**
- * Get rid of the ttorrent extension to obtain original filename
+ * Get rid of the ttorrent extension to obtain original filename and initialize the 
+ * structure pointed by torrent with fio_create_torrent_from_metainfo_file
  * @param metainfo string with .ttorrent extension 
- * @return pointer to the string without .ttorrent or NULL if error
+ * @param ttorent Non null pointer to an allocated fio_torrent_t struct
+ * @return -1 if error 0 on success
  */
-char *utils_original_file_name(const char *const metainfo);
-
 int utils_create_torrent_struct(char *metainfo, struct fio_torrent_t *torrent);
 
 

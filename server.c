@@ -28,7 +28,6 @@
   c. Otherwise, respond with a message signaling the unavailability of the block.
 */
 
-// TODO Handle free when an error occurs
 int server_init(uint16_t const port, struct fio_torrent_t *torrent) {
 
     if (torrent->downloaded_file_size == 0) {
@@ -149,13 +148,15 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                     int rcv = accept(sockd, (struct sockaddr *)&client, &size);
 
                     if (rcv < 0) {
-                        log_printf(LOG_DEBUG, "Error while accepting the connection: %s", strerror(errno));
-                        return -1;
+                        log_printf(LOG_DEBUG, "Error while accepting the connection: %s, ignoring connection", strerror(errno));
+                        errno = 0;
+                        // return -1;
                     }
 
                     // set socket to non-blocking
                     if (fcntl(rcv, F_SETFL, O_NONBLOCK)) {
                         log_printf(LOG_DEBUG, "cannot set the socket to non-blocking, dropping socket: %s", strerror(errno));
+                        errno = 0;
                         continue;
                     }
 
