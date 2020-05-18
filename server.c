@@ -232,32 +232,34 @@ int server__non_blocking(const int sockd, struct fio_torrent_t *const torrent) {
                     }
 
                     log_printf(LOG_INFO, "Send sucess");
-                } else {
-                    // contruct the payload and send it
-
-                    struct fio_block_t block;
-                    struct utils_message_payload_t payload;
-
-                    payload.magic_number = MAGIC_NUMBER;
-                    payload.message_code = MSG_RESPONSE_OK;
-                    payload.block_number = msg_rcv->block_number;
-                    log_printf(LOG_INFO, "Sending payload for block %lu from socked %i", payload.block_number, t->fd);
-
-                    if (fio_load_block(torrent, payload.block_number, &block)) {
-                        log_printf(LOG_INFO, "Cannot load block %i", payload.block_number);
-                        continue;
-                    }
-
-                    memcpy(payload.data, block.data, block.size);
-
-                    if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE + block.size) <= 0) {
-                        log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
-                        errno = 0;
-                        continue;
-                    }
-
-                    log_printf(LOG_INFO, "Send sucess");
+                    continue;
                 }
+
+                // contruct the payload and send it
+
+                struct fio_block_t block;
+                struct utils_message_payload_t payload;
+
+                payload.magic_number = MAGIC_NUMBER;
+                payload.message_code = MSG_RESPONSE_OK;
+                payload.block_number = msg_rcv->block_number;
+                log_printf(LOG_INFO, "Sending payload for block %lu from socked %i", payload.block_number, t->fd);
+
+                if (fio_load_block(torrent, payload.block_number, &block)) {
+                    log_printf(LOG_INFO, "Cannot load block %i", payload.block_number);
+                    continue;
+                }
+
+                memcpy(payload.data, block.data, block.size);
+
+                if (utils_send_all(t->fd, &payload, RAW_MESSAGE_SIZE + block.size) <= 0) {
+                    log_printf(LOG_INFO, "Could not send the payload: %s", strerror(errno));
+                    errno = 0;
+                    continue;
+                }
+
+                log_printf(LOG_INFO, "Send sucess");
+                continue;
 
             } // POLLOUT
 

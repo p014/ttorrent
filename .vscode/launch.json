@@ -12,8 +12,8 @@
       "args": [
         // "-c", // create metainfo
         // "testfile.txt"
-        "-l", //server
-        "8087",
+        // "-l", //server
+        // "8087",
         "random.fil.ttorrent"
       ],
       "stopAtEntry": false,
