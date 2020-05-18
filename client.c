@@ -160,7 +160,7 @@ int client__handle_connection(struct fio_torrent_t *t, const int s) {
             if (response_msg->magic_number != MAGIC_NUMBER ||
                 response_msg->message_code != MSG_RESPONSE_OK ||
                 response_msg->block_number != k) {
-                log_printf(LOG_INFO, "Magic number, messagecode or block number wrong, dropping client!");
+                log_printf(LOG_INFO, "Magic number, messagecode or block number wrong, trying next peer!");
                 return -1; // try next peer
             }
 
