@@ -695,6 +695,7 @@ ssize_t utils_send_all(int socket, void *buffer, size_t length) {
 ssize_t utils_recv_all(int socket, void *buffer, size_t length) {
     char *ptr = (char *)buffer;
     size_t total_lenth = 0;
+#include <poll.h>
     while (length > 0) {
         ssize_t i = recv(socket, ptr, length, MSG_NOSIGNAL);
         if (i < 1)
