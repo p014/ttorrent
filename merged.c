@@ -1,4 +1,3 @@
-
 #include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
@@ -7,6 +6,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <openssl/sha.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -483,8 +483,6 @@ int fio_create_metainfo(char *file_name) {
     free(info.block_sha256);
     return 0;
 }
-#include <poll.h>
-
 struct utils_message_t {
     uint32_t magic_number;
     uint8_t message_code;
