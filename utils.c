@@ -18,6 +18,11 @@ int utils_create_torrent_struct(char *metainfo, struct fio_torrent_t *torrent) {
         return -1;
     }
 
+    if (strcmp(end, ".ttorrent")) {
+        log_message(LOG_DEBUG, "Invalid file extension");
+        return -1;
+    }
+
     uint32_t charcount = (uint32_t)(end - metainfo);
     if (charcount > 255) {
         log_printf(LOG_INFO, "File name cannot have more than 255 characters: got %u", charcount);
